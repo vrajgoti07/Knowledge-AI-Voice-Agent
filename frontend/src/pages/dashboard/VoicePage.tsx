@@ -10,6 +10,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   Mic, MicOff, PhoneOff, AlertCircle, Loader2, AudioLines, VolumeX
 } from 'lucide-react'
@@ -226,7 +227,7 @@ const mdComponents: Record<string, React.FC<any>> = {
   li: ({ children }) => (
     <li className="leading-relaxed">{children}</li>
   ),
-  code: ({ inline, children }) =>
+  code: ({ inline, children }: any) =>
     inline ? (
       <code className="px-1.5 py-0.5 rounded bg-white/10 text-sky-300 text-[11px] font-mono">{children}</code>
     ) : (
@@ -234,6 +235,28 @@ const mdComponents: Record<string, React.FC<any>> = {
         <code>{children}</code>
       </pre>
     ),
+  table: ({ children }) => (
+    <div className="my-4 w-full overflow-x-auto rounded-lg border border-white/10 bg-slate-900/80 shadow-md">
+      <table className="w-full text-left text-xs text-slate-200 border-collapse">{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => (
+    <thead className="bg-sky-950/60 text-[11px] font-semibold uppercase tracking-wider text-sky-300 border-b border-white/10">
+      {children}
+    </thead>
+  ),
+  tbody: ({ children }) => (
+    <tbody className="divide-y divide-white/10">{children}</tbody>
+  ),
+  tr: ({ children }) => (
+    <tr className="hover:bg-white/[0.04] transition-colors">{children}</tr>
+  ),
+  th: ({ children }) => (
+    <th className="px-3 py-2 font-semibold text-sky-300 border-b border-white/10">{children}</th>
+  ),
+  td: ({ children }) => (
+    <td className="px-3 py-2 text-slate-300 leading-relaxed align-top">{children}</td>
+  ),
 }
 
 // ── Dynamic Karaoke Speaking Highlight Component ──────────────
@@ -301,7 +324,7 @@ function KaraokeMarkdown({
             : undefined
         }
       >
-        <ReactMarkdown components={mdComponents}>{cleanText}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{cleanText}</ReactMarkdown>
       </div>
     </div>
   )

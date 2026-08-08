@@ -98,7 +98,7 @@ def _generate_rag_response_core(
         query=user_query,
         retrieved_chunks=retrieved_chunks,
         zero_chunk_mode=zero_chunk_mode,
-    )
+    )  # query passed for fallback quick-answer heuristic extraction
 
     t3 = time.time()
     logger.info(

@@ -171,6 +171,21 @@ def extract_text_from_file(file_bytes: bytes, filename: str, ext: str) -> tuple[
                 pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
                 logger.info(f"PDF Extraction (PyMuPDF): Opened '{filename}' ({len(file_bytes)} bytes, {len(pdf_doc)} pages)")
                 for idx, page in enumerate(pdf_doc, start=1):
+                    # ── Table Detection Engine: PyMuPDF find_tables() ────────────────
+                    page_tables_md = []
+                    try:
+                        if hasattr(page, "find_tables"):
+                            tabs = page.find_tables()
+                            for tab in tabs:
+                                try:
+                                    tab_md = tab.to_markdown()
+                                    if tab_md and "|" in tab_md:
+                                        page_tables_md.append(tab_md.strip())
+                                except Exception:
+                                    pass
+                    except Exception as te:
+                        logger.debug(f"Table detection notice on page {idx}: {te}")
+
                     page_text = (page.get_text("text") or "").strip()
                     if not page_text:
                         blocks = page.get_text("blocks")
@@ -178,6 +193,15 @@ def extract_text_from_file(file_bytes: bytes, filename: str, ext: str) -> tuple[
                         page_text = "\n".join(b_texts).strip()
                     
                     page_text = page_text.replace("\x00", "").strip()
+
+                    # Append extracted Markdown tables to page text
+                    if page_tables_md:
+                        tables_combined = "\n\n".join(page_tables_md)
+                        if page_text:
+                            page_text = page_text + "\n\n" + tables_combined
+                        else:
+                            page_text = tables_combined
+
                     if page_text:
                         pages_data.append({"page_number": idx, "text": page_text})
                         full_pages.append(page_text)
@@ -329,21 +353,42 @@ def process_document_background(
 
                 for c in c_list:
                     is_fm = is_boilerplate_text(c["content"], p_num)
+                    sec_num = c.get("section_number")
+                    sec_title = c.get("section_title")
+                    parent_sec = c.get("parent_section")
+
                     chunk_obj = DocumentChunk(
                         document_id=doc.id,
                         chunk_index=chunk_index_counter,
                         content=c["content"],
                         tokens=c["tokens"],
-                        page_number=p_num
+                        page_number=p_num,
+                        section_number=sec_num,
+                        section_title=sec_title,
+                        parent_section=parent_sec
                     )
                     db.add(chunk_obj)
+
                     created_chunks_list.append({
                         "chunk_index": chunk_index_counter,
                         "content": c["content"],
                         "tokens": c["tokens"],
                         "page_number": p_num,
-                        "is_frontmatter": is_fm
+                        "is_frontmatter": is_fm,
+                        "section_number": sec_num,
+                        "section_title": sec_title,
+                        "parent_section": parent_sec
                     })
+
+                    # Log metadata for the first 20 chunks for verification
+                    if chunk_index_counter < 20:
+                        logger.info(
+                            f"[{doc_id}] [Chunk Metadata {chunk_index_counter+1:02d}/20] "
+                            f"page={p_num:>3} | sec='{sec_num or 'N/A'}' | "
+                            f"title='{sec_title or 'N/A'}' | "
+                            f"parent='{(parent_sec or 'N/A')[:40]}'"
+                        )
+
                     total_tokens += c["tokens"]
                     chunk_index_counter += 1
 

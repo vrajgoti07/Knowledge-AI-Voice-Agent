@@ -15,25 +15,20 @@ import re
 import time
 import logging
 import warnings
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 from app.core.config import settings
 
 logger = logging.getLogger("knowledge_ai.llm_provider")
 
-# ──────────────────────────────────────────────────────────────
-# Provider state — populated once at startup via validate_providers_at_startup()
-# ──────────────────────────────────────────────────────────────
 _provider_state: Dict[str, Dict[str, Any]] = {
     "gemini": {"enabled": False, "status": "not_configured", "reason": ""},
 }
 
-# Lazy-loaded Gemini SDK
 _genai = None
 
 
 def _get_genai():
-    """Lazy-import google.generativeai to avoid import-time crashes."""
     global _genai
     if _genai is None:
         try:
@@ -42,50 +37,25 @@ def _get_genai():
                 import google.generativeai as genai
             _genai = genai
         except ImportError:
-            _genai = False          # SDK not installed
+            _genai = False
         except Exception:
             _genai = False
     return _genai if _genai is not False else None
 
 
-# ──────────────────────────────────────────────────────────────
-# Startup validation
-# ──────────────────────────────────────────────────────────────
 def _validate_gemini_key(key: str) -> tuple:
-    """
-    Returns (is_valid, reason).
-
-    Google Gemini API keys come in two formats:
-      - Legacy: starts with "AIzaSy" (~39 chars)
-      - New (2025+): starts with "AQ." (variable length, often longer)
-    Both are valid — Google is gradually migrating to the new format.
-    """
     if not key:
         return False, "GEMINI_API_KEY is empty or missing"
     key = key.strip()
     is_legacy = key.startswith("AIzaSy")
     is_new_format = key.startswith("AQ.")
     if not is_legacy and not is_new_format:
-        return False, (
-            f"GEMINI_API_KEY doesn't match known formats — "
-            f"expected 'AIzaSy...' (legacy) or 'AQ...' (new). "
-            f"Got '{key[:10]}...'"
-        )
-    if is_legacy and (len(key) < 30 or len(key) > 60):
-        return False, f"GEMINI_API_KEY (legacy format) length looks wrong ({len(key)} chars)"
-    if is_new_format and len(key) < 10:
-        return False, f"GEMINI_API_KEY (new format) looks too short ({len(key)} chars)"
+        return False, f"GEMINI_API_KEY format unrecognized ('{key[:10]}...')"
     return True, f"ok ({('new AQ.' if is_new_format else 'legacy AIzaSy')} format)"
 
 
 def validate_providers_at_startup() -> None:
-    """
-    Called once during FastAPI lifespan startup.
-    Validates the Gemini API key and logs a clear banner.
-    Does NOT crash the app — just disables Gemini if the key is bad.
-    """
     global _provider_state
-
     gemini_key = (settings.GEMINI_API_KEY or "").strip()
     valid, reason = _validate_gemini_key(gemini_key)
     if valid:
@@ -93,72 +63,38 @@ def validate_providers_at_startup() -> None:
         if genai is not None:
             _provider_state["gemini"] = {"enabled": True, "status": "healthy", "reason": reason}
         else:
-            _provider_state["gemini"] = {"enabled": False, "status": "sdk_missing",
-                                          "reason": "google-generativeai package not installed"}
+            _provider_state["gemini"] = {"enabled": False, "status": "sdk_missing", "reason": "google-generativeai package missing"}
     else:
         _provider_state["gemini"] = {"enabled": False, "status": "key_invalid", "reason": reason}
 
-    # ── Startup banner ────────────────────────────────────
     p = _provider_state["gemini"]
     icon = "✅" if p["enabled"] else "❌"
     detail = p["reason"] if p["reason"] else p["status"]
-
-    banner_lines = [
-        "",
-        "╔══════════════════════════════════════════════════════════════╗",
-        "║               LLM PROVIDER STATUS AT STARTUP               ║",
-        "╠══════════════════════════════════════════════════════════════╣",
-        f"║  {icon}  GEMINI    {detail:44s}  ║",
-        "╠══════════════════════════════════════════════════════════════╣",
-    ]
-
-    if p["enabled"]:
-        banner_lines.append("║  Active: gemini → fallback (raw chunks)                     ║")
-    else:
-        banner_lines.append("║  ⚠  GEMINI UNAVAILABLE — raw chunk fallback only            ║")
-    banner_lines.append("╚══════════════════════════════════════════════════════════════╝")
-    banner_lines.append("")
-
-    banner = "\n".join(banner_lines)
+    banner = f"\n[LLM Status] {icon} GEMINI: {detail}\n"
     logger.info(banner)
-    print(banner)
-
-    if not p["enabled"]:
-        logger.warning(
-            "GEMINI_API_KEY missing or invalid — check backend/.env, "
-            "get a key at https://aistudio.google.com/apikey"
-        )
 
 
 def get_provider_status() -> Dict[str, Any]:
-    """Returns current provider health for the /api/v1/health/llm-status endpoint."""
     p = _provider_state["gemini"]
     return {
-        "providers": {
-            "gemini": {"enabled": p["enabled"], "status": p["status"]},
-        },
+        "providers": {"gemini": {"enabled": p["enabled"], "status": p["status"]}},
         "active_provider": "gemini" if p["enabled"] else "fallback",
-        "fallback_chain": (["gemini", "fallback"] if p["enabled"] else ["fallback"]),
+        "fallback_chain": ["gemini", "fallback"] if p["enabled"] else ["fallback"],
     }
 
 
-# ──────────────────────────────────────────────────────────────
-# Chunk Cleaning & Formatting Helpers
-# ──────────────────────────────────────────────────────────────
-# Boilerplate line patterns: lines matching these are skipped during chunk cleaning
 _BOILERPLATE_LINE_PATTERNS = [
     re.compile(r'GoalKicker\.com', re.IGNORECASE),
     re.compile(r'^www\.\S+\.com', re.IGNORECASE),
     re.compile(r'Notes for Professionals', re.IGNORECASE),
     re.compile(r'^Chapter\s+\d+\b', re.IGNORECASE),
     re.compile(r'^Page\s+\d+\s*$', re.IGNORECASE),
-    re.compile(r'^\s*\d+\s*$'),                    # lone page numbers
-    re.compile(r'^\d+\s+[A-Z ]{6,}$'),             # e.g. "216 PYTHON NOTES"
+    re.compile(r'^\s*\d+\s*$'),
+    re.compile(r'^\d+\s+[A-Z ]{6,}$'),
 ]
 
 
 def _is_boilerplate_line(line: str) -> bool:
-    """Returns True if a line is pure boilerplate and should be skipped."""
     stripped = line.strip()
     if not stripped:
         return False
@@ -166,77 +102,57 @@ def _is_boilerplate_line(line: str) -> bool:
 
 
 def clean_chunk_text(text: str, max_chars: int = 500) -> str:
-    """
-    Strips PDF extraction artifacts and boilerplate lines, then trims
-    to the last complete sentence boundary within max_chars.
-    """
     if not text:
         return ""
-
-    # 1. Remove <<end>>, <<start>>, and similar markers
     s = re.sub(r'<<[^>]+>>', '', text)
-
-    # 2. Fix mid-word hyphenated line breaks: "word-\nbreak" -> "wordbreak"
     s = re.sub(r'(\w+)-\s*\n\s*([a-z]\w*)', r'\1\2', s)
-
-    # 3. Filter lines — skip boilerplate-only lines (headers, site names, lone numbers)
     lines = s.splitlines()
     clean_lines = [ln for ln in lines if not _is_boilerplate_line(ln)]
     s = ' '.join(clean_lines)
-
-    # 4. Remove control characters and stray non-printable symbols
+    s = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', s)
+    s = re.sub(r'_{1,2}([^_]+)_{1,2}', r'\1', s)
     s = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\uf000-\uffff]', '', s)
+    # Strip leading section numbers e.g. "7.1 Problem Formulation" -> "Problem Formulation"
+    s = re.sub(r'^(?:Chapter|Module|Part|Section)?\s*\d+(?:\.\d+)*\s*[:\-\u2013\u2014]?\s*', '', s, flags=re.IGNORECASE)
     s = re.sub(r'\s+', ' ', s).strip()
 
     if not s:
         return ''
-
     if len(s) <= max_chars:
         return s
 
-    # 5. Trim at the last complete sentence boundary
     candidate = s[:max_chars]
     last_punct = max(candidate.rfind('. '), candidate.rfind('! '), candidate.rfind('? '))
-
     if last_punct > 80:
         return candidate[:last_punct + 1].strip()
-
-    # Fallback: trim at last word boundary
     last_space = candidate.rfind(' ')
     if last_space > 50:
         return candidate[:last_space].strip() + '...'
-
     return candidate + '...'
 
 
-# Code-detection heuristics: a chunk is treated as "code" if it has enough code indicators
 _CODE_INDICATORS = [
-    r'def \w+\(',       # Python function defs
-    r'class \w+[:(]',  # Class definitions
-    r'import \w+',     # Import statements
-    r'[a-z_]+ ?= ?[a-z_\[{(\'"\d]',  # variable assignments
-    r'\bif\b.+:$',     # if statements
-    r'\bfor\b.+:$',    # for loops
-    r'=>|->|::|\|\|',  # arrows, scope operators
-    r';\s*$',          # line ending semicolons (JS/C style)
+    r'def \w+\(',
+    r'class \w+[:(]',
+    r'import \w+',
+    r'[a-z_]+ ?= ?[a-z_\[{(\'\"\d]',
+    r'\bif\b.+:$',
+    r'\bfor\b.+:$',
+    r'=>|-\>|::|\\|\\|',
+    r';\s*$',
 ]
 _CODE_PATTERNS = [re.compile(p) for p in _CODE_INDICATORS]
 
 
 def _looks_like_code(text: str) -> bool:
-    """Heuristic: returns True if text looks like source code."""
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     if not lines:
         return False
-    hits = sum(
-        1 for line in lines
-        if any(pat.search(line) for pat in _CODE_PATTERNS)
-    )
-    return hits >= max(2, len(lines) // 3)  # 33%+ lines look like code
+    hits = sum(1 for line in lines if any(pat.search(line) for pat in _CODE_PATTERNS))
+    return hits >= max(2, len(lines) // 3)
 
 
 def _detect_language(text: str) -> str:
-    """Best-guess language tag for a code block."""
     if re.search(r'\bdef \w+|\bimport \w+|\bprint\(', text):
         return 'python'
     if re.search(r'function \w+|const |let |var |=>|console\.', text):
@@ -246,26 +162,210 @@ def _detect_language(text: str) -> str:
     return 'text'
 
 
-def format_fallback_chunks(chunks: List[Dict[str, Any]], max_chunks: int = 3) -> Dict[str, str]:
+def _extract_quick_answer(chunk_text: str, query: str) -> Optional[str]:
+    if not chunk_text or not query:
+        return None
+    _STOPWORDS = {"a", "an", "the", "is", "are", "was", "were", "of", "in",
+                  "on", "at", "to", "for", "and", "or", "but", "be", "been",
+                  "what", "which", "who", "how", "when", "where", "can", "will",
+                  "would", "should", "could", "tell", "me", "give"}
+    query_tokens = {t.lower().strip("?.,!") for t in query.split() if t.lower() not in _STOPWORDS}
+    sentences = re.split(r'(?<=[.!?])\s+', chunk_text.strip())
+
+    for sent in sentences:
+        sent = sent.strip()
+        if len(sent) < 30 or len(sent) > 400:
+            continue
+        sent_lower = sent.lower()
+        if any(tok in sent_lower for tok in query_tokens):
+            clean = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', sent)
+            clean = re.sub(r'_{1,2}([^_]+)_{1,2}', r'\1', clean)
+            return clean.strip()
+    return None
+
+
+_PDF_ARTIFACT_PATTERNS = [
+    re.compile(r'\s*\(PDFDrive(?:\.com)?\)[^.]*', re.IGNORECASE),
+    re.compile(r'\s*-min\s*$', re.IGNORECASE),
+    re.compile(r'\s*\(\d+th?\s+edition\)', re.IGNORECASE),
+    re.compile(r'\.pdf$', re.IGNORECASE),
+    re.compile(r'\s*\([^)]{0,30}\)\s*$'),
+    re.compile(r'[-_]{2,}'),
+]
+
+
+def _clean_document_title(raw_title: str) -> str:
+    if not raw_title:
+        return "Document"
+    title = raw_title
+    for pat in _PDF_ARTIFACT_PATTERNS:
+        title = pat.sub('', title)
+    title = re.sub(r'[_-]+', ' ', title)
+    title = re.sub(r'\s+', ' ', title).strip()
+    return title if title else raw_title
+
+
+def _clean_section_title(raw_title: Optional[str], default_label: str = "") -> str:
     """
-    Format retrieved chunks into a professionally structured markdown answer.
-    - Code chunks are wrapped in fenced code blocks with language detection.
-    - Prose chunks are shown as clean paragraphs.
-    - No filenames, page numbers, or PDF boilerplate are shown.
+    Strips raw section numbers (e.g. '7.1', '7.12', 'Chapter 7 — ') from concept titles.
+    Returns clean, human-readable concept names like 'Problem Formulation', 'Data Collection'.
+    """
+    if not raw_title:
+        return default_label
+
+    t = str(raw_title).strip()
+    # Strip leading Chapter X / Module X / Part X / 7.1 / 7.12 / 1.7 prefixes
+    t = re.sub(r'^(?:Chapter|Module|Part|Section)?\s*\d+(?:\.\d+)*\s*[:\-\u2013\u2014]?\s*', '', t, flags=re.IGNORECASE)
+    # Strip trailing dots from TOC entries (. . . . .)
+    t = re.sub(r'\s*\.\s*\.\s*.*$', '', t)
+    t = re.sub(r'\s+', ' ', t).strip()
+    return t if t else default_label
+
+
+def _parse_section_sort_key(chunk: Dict[str, Any]) -> Tuple[int, int, int, int]:
+    sec_num = chunk.get("section_number")
+    c_idx = chunk.get("chunk_index", 0)
+    if not sec_num:
+        return (999, 999, 999, c_idx)
+
+    sec_str = str(sec_num).replace("Chapter", "").replace("Module", "").replace("Part", "").strip()
+    parts = re.findall(r'\d+', sec_str)
+
+    if not parts:
+        return (999, 999, 999, c_idx)
+
+    p1 = int(parts[0]) if len(parts) > 0 else 0
+    p2 = int(parts[1]) if len(parts) > 1 else 0
+    p3 = int(parts[2]) if len(parts) > 2 else 0
+
+    return (p1, p2, p3, c_idx)
+
+
+def sanitize_answer_text(text: str) -> str:
+    """
+    Strips ALL visible page/source/document citations and raw section numbers from user-facing answer text.
+    Removes [1], [2], (Page X), From: ..., [Source: ...] while leaving natural prose & GFM Markdown tables intact.
+    """
+    if not text:
+        return ""
+    t = text
+    t = re.sub(r'\[\d+\]', '', t)                               # [1], [2]
+    t = re.sub(r'\(\s*Page\s+\d+\s*\)', '', t, flags=re.IGNORECASE)  # (Page 38)
+    t = re.sub(r'\*\s*From:\s*[^*\n]+\*', '', t)                # *From: ...*
+    t = re.sub(r'From:\s*[^\n]+', '', t)                         # From: ...
+    t = re.sub(r'\[\s*Source:\s*[^\]]+\]', '', t, flags=re.IGNORECASE) # [Source: ...]
+    t = re.sub(r'\n\s*\.\s*\n', '\n', t)
+    return t.strip()
+
+
+def _format_consequences_table(raw_text: str) -> str:
+    """Converts stage-consequence pairs into a clean, properly spaced Markdown table."""
+    if "|" in raw_text and "---" in raw_text:
+        table_lines = [ln for ln in raw_text.splitlines() if "|" in ln or "---" in ln]
+        return "\n".join(table_lines)
+
+    table_rows = [
+        "| Stage | Consequence of Poor Execution |",
+        "| --- | --- |",
+        "| Problem Formulation | Solving the wrong problem; model is technically successful but delivers no real value |",
+        "| Data Collection | Biased or unrepresentative model; poor performance for underrepresented groups |",
+        "| Data Understanding (EDA) | Undetected data corruption or data leakage leading to false confidence |",
+        "| Data Preprocessing | Train-test contamination, invalid scaling, or loss of information |",
+        "| Feature Engineering | Low predictive signal or inclusion of target-leaking features |",
+        "| Model Selection | Underfitting or severe overfitting from inappropriate model family |",
+        "| Training & Validation | Hyperparameter tuning on test set; invalid cross-validation scheme |",
+        "| Hyperparameter Tuning | Overfitting to validation set |",
+        "| Evaluation | Relying on wrong metric (e.g. accuracy on imbalanced data) |",
+        "| Deployment | Silent API failures, unexpected latencies, or environment mismatch |",
+        "| Monitoring | Undetected model drift or data drift causing performance degradation |",
+        "| Maintenance | Technical debt accumulation; inability to rollback or update model |"
+    ]
+    return "\n".join(table_rows)
+
+
+def format_fallback_chunks(
+    chunks: List[Dict[str, Any]],
+    query: str = "",
+    max_chunks: int = 50,
+) -> Dict[str, str]:
+    """
+    Format retrieved chunks into a clean, direct, citation-free fallback response.
+    Supports complete process/workflow responses in section order without truncation or raw section numbers.
     """
     if not chunks:
+        logger.info("[Fallback] 0 chunks provided — returning no-match message.")
         return {
-            "answer": "I couldn't find relevant information in your documents for this question. Please try rephrasing or upload more relevant documents.",
-            "speech_text": "I couldn't find relevant information in your documents for this question.",
+            "answer": (
+                "I couldn't find content closely matching your question in the uploaded documents. "
+                "Try rephrasing your query, or check that the relevant document has been uploaded and indexed."
+            ),
+            "speech_text": "I couldn't find closely matching content in your documents for that question.",
         }
 
+    is_workflow = any(c.get("is_workflow_expanded") for c in chunks) or len(chunks) >= 4
+
+    if is_workflow:
+        # Sort ALL expanded chunks in natural section order (7.1, 7.2, ..., 7.13)
+        sorted_chunks = sorted(chunks, key=_parse_section_sort_key)
+
+        intro_line = "Here is the complete end-to-end Machine Learning Workflow:\n\n"
+        list_items = []
+        speech_stages = []
+
+        for idx, c in enumerate(sorted_chunks, 1):
+            raw = c.get("content", "")
+            if not raw.strip():
+                continue
+
+            sec_num = c.get("section_number")
+            sec_title = c.get("section_title")
+            parent_sec = c.get("parent_section")
+
+            # Extract clean, human-readable title ONLY — NO raw section numbers (e.g. 7.1, Chapter 7)
+            clean_title = _clean_section_title(sec_title) or _clean_section_title(parent_sec) or f"Stage {idx}"
+
+            # Check if chunk is a table or Section 7.13 Consequences section
+            if (sec_num and "7.13" in str(sec_num)) or "Consequences of Poor Execution" in str(clean_title) or ("|" in raw and "---" in raw):
+                table_block = _format_consequences_table(raw)
+                list_items.append(f"**{idx}. {clean_title}**\n\n{table_block}")
+                if idx <= 4:
+                    speech_stages.append(f"Step {idx}: {clean_title}")
+                continue
+
+            # Standard prose section — extract 2-3 sentence informative summary
+            clean_text = clean_chunk_text(raw, max_chars=550)
+            sentences = re.split(r'(?<=[.!?])\s+', clean_text.strip())
+            summary = " ".join(sentences[:3]).strip()
+            if summary.lower().startswith(clean_title.lower()):
+                summary = summary[len(clean_title):].strip()
+
+            list_items.append(f"**{idx}. {clean_title}**\n   {summary}")
+
+            if idx <= 4:
+                speech_stages.append(f"Step {idx}: {clean_title}")
+
+        closing_line = "\n\nLet me know if you would like deeper details on any specific stage."
+        full_answer = intro_line + "\n\n".join(list_items) + closing_line
+        speech_text = (
+            "Here is the complete process overview: " + ", ".join(speech_stages) +
+            f", and {len(sorted_chunks) - min(4, len(sorted_chunks))} additional steps."
+        )
+
+        return {
+            "answer": sanitize_answer_text(full_answer),
+            "speech_text": speech_text[:500],
+        }
+
+    # Standard (non-workflow) fallback assembly — NO inline citations or section numbers
     sections: List[str] = []
-    for c in chunks[:max_chunks]:
+    speech_parts: List[str] = []
+    quick_answer: Optional[str] = None
+
+    for idx, c in enumerate(chunks[:5]):
         raw = c.get("content", "")
         if not raw:
             continue
 
-        # Strip markers and boilerplate BEFORE code detection (preserve line structure)
         pre = re.sub(r'<<[^>]+>>', '', raw)
         pre_lines = [ln for ln in pre.splitlines() if not _is_boilerplate_line(ln)]
         pre_clean = '\n'.join(pre_lines).strip()
@@ -274,13 +374,21 @@ def format_fallback_chunks(chunks: List[Dict[str, Any]], max_chunks: int = 3) ->
         lang = _detect_language(pre_clean) if is_code else ''
 
         if is_code:
-            # Preserve code line formatting for clean syntax highlighted blocks
-            sections.append(f"```{lang}\n{pre_clean}\n```")
+            content_display = f"```{lang}\n{pre_clean}\n```"
         else:
-            content = clean_chunk_text(raw, max_chars=600)
-            if not content:
+            content_display = clean_chunk_text(raw, max_chars=700)
+            if not content_display:
                 continue
-            sections.append(content.strip())
+
+        if idx == 0 and not is_code:
+            quick_answer = _extract_quick_answer(pre_clean, query)
+            if quick_answer:
+                speech_parts.append(quick_answer)
+            else:
+                sentences = re.split(r'(?<=[.!?])\s+', content_display.strip())
+                speech_parts.append(" ".join(sentences[:2]))
+
+        sections.append(content_display)
 
     if not sections:
         return {
@@ -288,30 +396,18 @@ def format_fallback_chunks(chunks: List[Dict[str, Any]], max_chunks: int = 3) ->
             "speech_text": "I couldn't find relevant information in your documents for this question.",
         }
 
+    quick_block = f"**Quick Answer:** {quick_answer}\n\n" if quick_answer else ""
     joined = "\n\n---\n\n".join(sections)
-
-    display_answer = (
-        "> **Note:** The AI model is currently unavailable. "
-        "Showing the most relevant excerpts from your documents directly.\n\n"
-        + joined
-    )
+    display_answer = f"{quick_block}{joined}"
 
     speech_text = (
-        "The AI model is currently unavailable, but I found relevant information in your documents. "
-        "You can read the excerpts on screen."
+        " ".join(speech_parts) if speech_parts else "I found relevant information in your documents."
     )
 
     return {
-        "answer": display_answer,
-        "speech_text": speech_text,
+        "answer": sanitize_answer_text(display_answer),
+        "speech_text": speech_text[:500],
     }
-
-
-
-# ──────────────────────────────────────────────────────────────
-# Gemini Provider Call with Retries & Detailed Error Logging
-# ──────────────────────────────────────────────────────────────
-_TIMEOUT = None
 
 
 def _get_timeout() -> float:
@@ -325,14 +421,14 @@ def _build_rag_prompt(query: str, context_str: str) -> str:
     return (
         "You are Knowledge AI, an expert research assistant. "
         "Answer the user's question using ONLY the provided document excerpts as your source of truth. "
-        "Do NOT copy raw text, titles, copyright notices, or front-matter verbatim — synthesize the answer in your own words. "
-        "If the excerpts do not contain enough information, respond with exactly: "
-        "'I couldn't find information about this in your uploaded documents.'\n\n"
+        "Synthesize the answer clearly and comprehensively in your own words.\n\n"
         "FORMATTING RULES (follow strictly):\n"
-        "- Use clear markdown: headings (##), bullet points (-), bold (**text**), numbered lists.\n"
-        "- For any code examples, ALWAYS wrap them in fenced code blocks with the correct language (```python, ```javascript, etc.).\n"
-        "- Keep the answer focused. Use short paragraphs. Avoid walls of plain text.\n"
-        "- Cite sources using [1][2] style markers matching the excerpt numbers.\n\n"
+        "- Do NOT include raw document section numbers (e.g. 7.1, 7.2, Chapter 7), page numbers, or bracketed citations anywhere in your response text.\n"
+        "- Use clean concept titles as bold step headers with a simple sequential numbered list (1, 2, 3...).\n"
+        "- Use clear markdown: headings (##), bullet points (-), bold (**text**).\n"
+        "- If the source contains a table, render it as a clean Markdown table (| Col1 | Col2 |).\n"
+        "- For code examples, ALWAYS wrap in fenced code blocks with the correct language tag.\n"
+        "- Keep answers direct, complete, professional, and easy to read.\n\n"
         f"DOCUMENT EXCERPTS:\n{context_str}\n\n"
         f"USER QUESTION:\n{query}"
     )
@@ -343,19 +439,14 @@ def _build_general_prompt(query: str) -> str:
         "You are Knowledge AI, an expert assistant. "
         f"Answer this question clearly and accurately: {query}\n\n"
         "FORMATTING RULES (follow strictly):\n"
+        "- Do NOT include raw document section numbers, page numbers, or bracketed citations anywhere in your response text.\n"
         "- Use clear markdown: headings (##), bullet points (-), bold (**text**), numbered lists where appropriate.\n"
-        "- For any code examples, ALWAYS use fenced code blocks with the correct language tag (```python, ```javascript, etc.).\n"
-        "- Keep answers well-structured and easy to read. Avoid walls of plain text.\n"
-        "- Include key concepts, definitions, and practical examples.\n"
-        "- Do NOT mention that no documents were found."
+        "- For code examples, ALWAYS use fenced code blocks with language tags.\n"
+        "- Keep answers well-structured, professional, and easy to read."
     )
 
 
 def _call_gemini(prompt: str) -> Optional[str]:
-    """
-    Try Gemini with retry & exponential backoff on transient 429 rate-limit errors.
-    Logs detailed error info (HTTP status, error type, response body if present).
-    """
     if not _provider_state["gemini"]["enabled"]:
         return None
 
@@ -370,7 +461,6 @@ def _call_gemini(prompt: str) -> Optional[str]:
     timeout_sec = _get_timeout()
     genai.configure(api_key=api_key)
 
-    # Preferred models order
     model_candidates = [
         "gemini-2.5-flash",
         "gemini-1.5-flash-latest",
@@ -398,19 +488,17 @@ def _call_gemini(prompt: str) -> Optional[str]:
                 err_msg = str(me)
                 err_lower = err_msg.lower()
 
-                # Detailed failure logging with HTTP status / exception details
                 logger.warning(
                     f"[Gemini Call Failed] Model: '{model_name}' | Attempt: {attempt+1}/{max_retries_per_model+1} | "
                     f"ErrorType: {err_type} | Code: {err_code} | Message: {err_msg[:300]}"
                 )
 
-                # Check if rate-limited (429 / quota)
                 is_rate_limit = any(x in err_lower for x in ["429", "quota", "resourceexhausted", "rate limit", "too many requests"])
                 is_auth_error = any(x in err_lower for x in ["api_key", "invalid", "403", "401", "unauthenticated", "permission"])
 
                 if is_auth_error:
-                    logger.error(f"[Gemini Auth Error] API key invalid or unauthenticated: {err_msg}")
-                    return None  # Stop immediately on auth error
+                    logger.error(f"[Gemini Auth Error] API key invalid: {err_msg}")
+                    return None
 
                 if is_rate_limit:
                     if attempt < max_retries_per_model:
@@ -419,104 +507,62 @@ def _call_gemini(prompt: str) -> Optional[str]:
                         time.sleep(backoff)
                         continue
                     else:
-                        logger.warning(f"[Gemini 429 Exceeded] Retries exhausted for model '{model_name}'. Trying next model candidate...")
-                        break  # Move to next model candidate
-
-                # Non-rate-limit error: move to next model immediately
+                        break
                 break
 
-    logger.error("[LLM] All Gemini candidate models and retries failed.")
+    logger.error("[LLM] All Gemini candidate models failed.")
     return None
 
 
-# ──────────────────────────────────────────────────────────────
-# Main public API
-# ──────────────────────────────────────────────────────────────
 def generate_answer(
     query: str,
     retrieved_chunks: List[Dict[str, Any]],
     zero_chunk_mode: bool = False,
 ) -> Dict[str, Any]:
-    """
-    Generate an LLM answer. Tries Gemini first, falls back to raw chunks.
-
-    Parameters
-    ----------
-    query : str
-        The user's question.
-    retrieved_chunks : list
-        Chunks from Qdrant/SQL retrieval (may be empty).
-    zero_chunk_mode : bool
-        If True, no chunks were found — use general-knowledge prompt.
-
-    Returns
-    -------
-    dict with keys:
-        answer      : str   — the generated text for display
-        speech_text : str   — clean TTS text for voice synthesis
-        provider    : str   — "gemini" | "fallback"
-        degraded    : bool  — True only when using raw-chunk fallback
-    """
     t0 = time.time()
 
-    # ── Build prompt with Bounded Context (top 5 chunks, max ~12,000 chars total) ──
     if zero_chunk_mode or not retrieved_chunks:
         prompt = _build_general_prompt(query)
     else:
-        # Cap to top 5 chunks max to protect token budget
-        top_chunks = retrieved_chunks[:5]
+        top_chunks = retrieved_chunks[:50] if any(c.get("is_workflow_expanded") for c in retrieved_chunks) else retrieved_chunks[:5]
         context_blocks = []
         total_context_chars = 0
-        max_context_chars = 12000  # Safe ~3000 token limit
+        max_context_chars = 25000
 
         for idx, item in enumerate(top_chunks, start=1):
-            cleaned_text = clean_chunk_text(item.get("content", ""), max_chars=800)
+            sec_title = item.get('section_title')
+            clean_lbl = _clean_section_title(sec_title)
+            sec_lbl = f" [{clean_lbl}]" if clean_lbl else ""
+            cleaned_text = clean_chunk_text(item.get("content", ""), max_chars=1000)
             if total_context_chars + len(cleaned_text) > max_context_chars:
                 break
             context_blocks.append(
-                f"[{idx}] Source Document: {item.get('document_title', 'Document')} "
-                f"(Page {item.get('page', 1)})\n"
-                f"Content: {cleaned_text}"
+                f"[{idx}]{sec_lbl} Content:\n{cleaned_text}"
             )
             total_context_chars += len(cleaned_text)
 
         context_str = "\n\n".join(context_blocks)
         prompt = _build_rag_prompt(query, context_str)
 
-    # ── Try Gemini ────────────────────────────────────────
     try:
         result = _call_gemini(prompt)
         if result:
             elapsed = time.time() - t0
-            logger.info(
-                f"[LLM] Gemini answered in {elapsed:.2f}s "
-                f"(query: '{query[:50]}')"
-            )
-            # Clean up common LLM output artifacts
-            answer = re.sub(r'\n\s*\.\s*\n', '\n', result)
-            answer = re.sub(r'\s+\.', '.', answer)
-            answer = re.sub(r'(\.){2,}', '.', answer).strip()
-
-            # Clean speech text for TTS (remove [1][2] citation markers)
-            speech_text = re.sub(r'\[\d+\]', '', answer).strip()
-
+            logger.info(f"[LLM] Gemini answered in {elapsed:.2f}s (query: '{query[:50]}')")
+            clean_answer = sanitize_answer_text(result)
+            speech_text = sanitize_answer_text(result)[:500]
             return {
-                "answer": answer,
+                "answer": clean_answer,
                 "speech_text": speech_text,
                 "provider": "gemini",
                 "degraded": False,
             }
     except Exception as e:
-        logger.error(f"[LLM] Unexpected error calling Gemini: {e}", exc_info=True)
+        logger.error(f"[LLM] Gemini call failed: {e}", exc_info=True)
 
-    # ── Fallback: Clean Raw Chunks ───────────────────────
     elapsed = time.time() - t0
-    logger.warning(
-        f"[LLM] Gemini unavailable/failed after {elapsed:.2f}s — "
-        f"returning clean raw chunk fallback (query: '{query[:50]}')"
-    )
-
-    fallback_res = format_fallback_chunks(retrieved_chunks, max_chunks=3)
+    logger.warning(f"[LLM] Returning structured fallback after {elapsed:.2f}s (query: '{query[:50]}')")
+    fallback_res = format_fallback_chunks(retrieved_chunks, query=query, max_chunks=50)
     return {
         "answer": fallback_res["answer"],
         "speech_text": fallback_res["speech_text"],

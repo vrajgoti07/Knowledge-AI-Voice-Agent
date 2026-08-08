@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.session import engine, Base
 from app.db.seed import seed_database
-from app.routers import auth, documents, chat, admin, settings as settings_router, stats, health
+from app.routers import auth, documents, chat, admin, settings as settings_router, stats, health, debug as debug_router
 from app.websockets import chat_ws, documents_ws
 
 from app.core.qdrant_client import init_qdrant_collection
@@ -41,13 +41,19 @@ async def lifespan(app: FastAPI):
     except Exception as qerr:
         print(f"Qdrant startup notice: {qerr}")
 
-    # Pre-warm the embedding model asynchronously so server starts instantly
+    # Pre-warm the embedding model + cross-encoder at startup
     try:
         import asyncio
         from app.services.embedding_service import eager_load_model
-        asyncio.create_task(asyncio.to_thread(eager_load_model))
+        from app.services.retrieval_service import warm_cross_encoder
+
+        async def _warmup_models():
+            await asyncio.to_thread(eager_load_model)
+            await asyncio.to_thread(warm_cross_encoder)
+
+        asyncio.create_task(_warmup_models())
     except Exception as emb_err:
-        print(f"Embedding pre-warm notice: {emb_err}")
+        print(f"Model pre-warm notice: {emb_err}")
 
     # Validate LLM providers at startup and log health banner
     try:
@@ -121,6 +127,7 @@ app.include_router(admin.router, prefix=settings.API_V1_STR)
 app.include_router(settings_router.router, prefix=settings.API_V1_STR)
 app.include_router(stats.router, prefix=settings.API_V1_STR)
 app.include_router(health.router, prefix=settings.API_V1_STR)
+app.include_router(debug_router.router, prefix=settings.API_V1_STR)
 
 # Mount WebSockets
 app.include_router(chat_ws.router)

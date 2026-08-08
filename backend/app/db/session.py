@@ -38,6 +38,12 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+        for col in ["section_number", "section_title", "parent_section"]:
+            try:
+                conn.execute(text(f"ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS {col} VARCHAR"))
+                conn.commit()
+            except Exception:
+                pass
 
 def get_db():
     db = SessionLocal()

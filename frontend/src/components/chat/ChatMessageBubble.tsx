@@ -1,12 +1,13 @@
 // ============================================================
 // ChatMessageBubble — Clean Document Canvas Layout
-// Removes all [1], [2] citation tags and cleans sentence endings so sentences finish with a single dot .
+// Removes all [1], [2] citation tags and renders markdown prose with GFM table support
 // User Prompt: Prominent heading text-xl font-semibold text-white
 // AI Response: Typeset document, Volume2 TTS audio playback button, clean markdown prose
 // ============================================================
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Sparkles, Copy, Check, Volume2, VolumeX } from 'lucide-react'
 
 export interface Message {
@@ -32,12 +33,11 @@ function sanitizeText(content: string): string {
   return content
     .replace(/\[\d+\]/g, '')               // Remove numeric citation markers [1], [2]
     .replace(/\n\s*\.\s*\n/g, '\n')         // Remove standalone dot on its own line
-    .replace(/\s+\./g, '.')                 // Remove space before period
-    .replace(/(\.){2,}/g, '.')              // Replace duplicate periods with single dot
+    .replace(/From:\s*[^\n]+/g, '')          // Remove leftover From: lines
     .trim()
 }
 
-// Markdown components for clean typeset prose
+// Markdown components for clean typeset prose & GFM tables
 const mdComponents: Record<string, React.FC<any>> = {
   p: ({ children }) => (
     <p className="text-base text-slate-300 leading-loose mb-4 last:mb-0 font-normal">{children}</p>
@@ -55,7 +55,7 @@ const mdComponents: Record<string, React.FC<any>> = {
     <h2 className="text-base font-bold text-white mt-5 mb-2 first:mt-0 tracking-tight">{children}</h2>
   ),
   h3: ({ children }) => (
-    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-4 mb-2 first:mt-0">{children}</h3>
+    <h3 className="text-sm font-bold text-sky-300 tracking-wide mt-4 mb-2 first:mt-0">{children}</h3>
   ),
   ul: ({ children }) => (
     <ul className="space-y-2 my-4 ml-1">{children}</ul>
@@ -80,9 +80,31 @@ const mdComponents: Record<string, React.FC<any>> = {
       </pre>
     ),
   blockquote: ({ children }) => (
-    <blockquote className="my-4 pl-4 border-l-2 border-sky-400/50 text-slate-400 italic text-base leading-loose">
+    <blockquote className="my-3 pl-3 border-l-2 border-sky-400/40 text-slate-400 text-base leading-loose">
       {children}
     </blockquote>
+  ),
+  table: ({ children }) => (
+    <div className="my-6 w-full overflow-x-auto rounded-xl border border-white/10 bg-slate-900/80 shadow-xl">
+      <table className="w-full text-left text-sm text-slate-200 border-collapse">{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => (
+    <thead className="bg-sky-950/60 text-xs font-semibold uppercase tracking-wider text-sky-300 border-b border-white/10">
+      {children}
+    </thead>
+  ),
+  tbody: ({ children }) => (
+    <tbody className="divide-y divide-white/10">{children}</tbody>
+  ),
+  tr: ({ children }) => (
+    <tr className="hover:bg-white/[0.04] transition-colors">{children}</tr>
+  ),
+  th: ({ children }) => (
+    <th className="px-4 py-3 font-semibold text-sky-300 border-b border-white/10">{children}</th>
+  ),
+  td: ({ children }) => (
+    <td className="px-4 py-3 text-slate-300 leading-relaxed align-top">{children}</td>
   ),
 }
 
@@ -157,7 +179,7 @@ export function ChatMessageBubble({ message, index }: Props) {
               </span>
               {message.degraded && (
                 <span className="ml-2 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  ⚠ Showing raw document matches — AI summary unavailable
+                  AI offline — showing document excerpts
                 </span>
               )}
             </div>
@@ -200,7 +222,7 @@ export function ChatMessageBubble({ message, index }: Props) {
             {message.error ? (
               <p className="text-sm text-red-400 font-medium">{message.error}</p>
             ) : (
-              <ReactMarkdown components={mdComponents as any}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents as any}>
                 {cleanContent}
               </ReactMarkdown>
             )}

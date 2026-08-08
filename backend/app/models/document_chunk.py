@@ -11,3 +11,6 @@ class DocumentChunk(Base):
     content = Column(Text, nullable=False)
     page_number = Column(Integer, nullable=True)
     tokens = Column(Integer, default=0)
+    section_number = Column(String, nullable=True)
+    section_title = Column(String, nullable=True)
+    parent_section = Column(String, nullable=True)

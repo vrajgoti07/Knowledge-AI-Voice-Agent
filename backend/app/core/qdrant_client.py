@@ -15,6 +15,8 @@ _qdrant_client: Optional[QdrantClient] = None
 def get_qdrant_client() -> Optional[QdrantClient]:
     """
     Returns a singleton QdrantClient instance or None if connection fails.
+    Resets the cached client on each call if it's None (allows reconnection
+    after Docker restart without needing a backend restart).
     """
     global _qdrant_client
     if _qdrant_client is None:
@@ -25,10 +27,22 @@ def get_qdrant_client() -> Optional[QdrantClient]:
                 timeout=10.0,
                 check_compatibility=False
             )
+            # Quick health check to confirm connection
+            _qdrant_client.get_collections()
+            logger.info(f"[Qdrant] Connected to {settings.QDRANT_HOST}:{settings.QDRANT_PORT}")
         except Exception as e:
-            logger.warning(f"Failed to connect to Qdrant at {settings.QDRANT_HOST}:{settings.QDRANT_PORT}: {e}")
+            logger.warning(f"[Qdrant] Connection failed ({settings.QDRANT_HOST}:{settings.QDRANT_PORT}): {e}")
+            _qdrant_client = None  # Don't cache None — retry on next call
             return None
     return _qdrant_client
+
+
+def reset_qdrant_client() -> None:
+    """Force reconnection on next call (use after Docker restart)."""
+    global _qdrant_client
+    _qdrant_client = None
+    logger.info("[Qdrant] Client reset — will reconnect on next operation.")
+
 
 
 def init_qdrant_collection() -> bool:
@@ -92,7 +106,10 @@ def upsert_document_chunks(
             "document_title": str(doc_title),
             "page_number": c.get("page_number", 1),
             "text": c["content"],
-            "tokens": c.get("tokens", 0)
+            "tokens": c.get("tokens", 0),
+            "section_number": c.get("section_number"),
+            "section_title": c.get("section_title"),
+            "parent_section": c.get("parent_section")
         }
         points.append(qmodels.PointStruct(
             id=point_id,
@@ -204,6 +221,9 @@ def search_qdrant_chunks(
                 "page": p.get("page_number", 1),
                 "chunk_index": p.get("chunk_index", 0),
                 "is_frontmatter": p.get("is_frontmatter", False),
+                "section_number": p.get("section_number"),
+                "section_title": p.get("section_title"),
+                "parent_section": p.get("parent_section"),
                 "score": round(float(getattr(hit, "score", 0.0)), 4)
             })
 
@@ -211,3 +231,65 @@ def search_qdrant_chunks(
     except Exception as e:
         logger.error(f"Error performing vector search in Qdrant: {e}")
         return []
+
+
+def fetch_parent_section_chunks_qdrant(
+    doc_id: str,
+    parent_section: Optional[str] = None,
+    section_prefix: Optional[str] = None,
+    limit: int = 25
+) -> List[Dict[str, Any]]:
+    """
+    Retrieves all sibling chunks for a document belonging to a parent section or section number prefix (e.g. '7.').
+    Used for query expansion on multi-step workflow/process questions.
+    """
+    client = get_qdrant_client()
+    if not client:
+        return []
+
+    try:
+        conditions = [
+            qmodels.FieldCondition(key="document_id", match=qmodels.MatchValue(value=str(doc_id)))
+        ]
+        if parent_section:
+            conditions.append(
+                qmodels.FieldCondition(key="parent_section", match=qmodels.MatchValue(value=str(parent_section)))
+            )
+
+        query_filter = qmodels.Filter(must=conditions)
+        points, _ = client.scroll(
+            collection_name=COLLECTION_NAME,
+            scroll_filter=query_filter,
+            limit=limit,
+            with_payload=True,
+            with_vectors=False
+        )
+
+        results = []
+        for pt in points:
+            p = pt.payload or {}
+            sec_num = p.get("section_number")
+            # If section_prefix specified, filter matching section numbers
+            if section_prefix and sec_num:
+                if not (sec_num.startswith(section_prefix) or sec_num.startswith(section_prefix.rstrip('.'))):
+                    continue
+
+            results.append({
+                "document_id": p.get("document_id"),
+                "document_title": p.get("document_title", ""),
+                "content": p.get("text", ""),
+                "page": p.get("page_number", 1),
+                "chunk_index": p.get("chunk_index", 0),
+                "is_frontmatter": p.get("is_frontmatter", False),
+                "section_number": sec_num,
+                "section_title": p.get("section_title"),
+                "parent_section": p.get("parent_section"),
+                "score": 0.85  # Default score for parent expansion matches
+            })
+
+        results.sort(key=lambda x: x["chunk_index"])
+        return results
+    except Exception as e:
+        logger.error(f"Error scrolling parent section chunks from Qdrant: {e}")
+        return []
+
