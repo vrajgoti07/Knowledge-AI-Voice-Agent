@@ -7,6 +7,7 @@ import {
 import { cn } from '@/utils'
 import { useAuthStore } from '@/store/authStore'
 import { ROUTES } from '@/constants'
+import { AppLogo } from '@/components/common/AppLogo'
 
 interface NavItemDef {
   label: string
@@ -15,22 +16,22 @@ interface NavItemDef {
 }
 
 const USER_NAV_ITEMS: NavItemDef[] = [
-  { label: 'My Dashboard',     href: ROUTES.DASHBOARD,        icon: LayoutDashboard },
-  { label: 'AI Chat',          href: '/chat',                  icon: MessageSquare },
-  { label: 'Voice Assistant',  href: ROUTES.VOICE,             icon: Mic },
-  { label: 'My Projects',      href: '/projects',              icon: Folder },
-  { label: 'Personal Library', href: '/personal-library',      icon: Bookmark },
-  { label: 'Settings',         href: ROUTES.SETTINGS,          icon: Settings },
+  { label: 'My Dashboard', href: ROUTES.DASHBOARD, icon: LayoutDashboard },
+  { label: 'AI Chat', href: '/chat', icon: MessageSquare },
+  { label: 'Voice Assistant', href: ROUTES.VOICE, icon: Mic },
+  { label: 'My Projects', href: '/projects', icon: Folder },
+  { label: 'Personal Library', href: '/personal-library', icon: Bookmark },
+  { label: 'Settings', href: ROUTES.SETTINGS, icon: Settings },
 ]
 
 
 const ADMIN_NAV_ITEMS: NavItemDef[] = [
-  { label: 'Overview',       href: ROUTES.ADMIN,             icon: LayoutDashboard },
-  { label: 'AI Models',      href: '/admin/models',          icon: Cpu },
-  { label: 'Knowledge Base', href: '/admin/datasets',        icon: Database },
-  { label: 'Team Access',    href: ROUTES.ADMIN_USERS,       icon: Users },
-  { label: 'Monitoring',     href: '/admin/monitoring',      icon: Activity },
-  { label: 'Settings',      href: ROUTES.ADMIN_SETTINGS,     icon: Settings },
+  { label: 'Overview', href: ROUTES.ADMIN, icon: LayoutDashboard },
+  { label: 'AI Models', href: '/admin/models', icon: Cpu },
+  { label: 'Knowledge Base', href: '/admin/datasets', icon: Database },
+  { label: 'Team Access', href: ROUTES.ADMIN_USERS, icon: Users },
+  { label: 'Monitoring', href: '/admin/monitoring', icon: Activity },
+  { label: 'Settings', href: ROUTES.ADMIN_SETTINGS, icon: Settings },
 ]
 
 export function AppSidebar() {
@@ -45,9 +46,7 @@ export function AppSidebar() {
         {/* Brand Header */}
         <div className="h-16 px-5 flex items-center justify-between border-b border-white/10 bg-[#0B1120]">
           <Link to={isAdmin ? ROUTES.ADMIN : ROUTES.DASHBOARD} className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#38BDF8] to-[#3B82F6] text-[#0F172A] flex items-center justify-center font-extrabold text-sm shadow-[0_0_15px_rgba(56,189,248,0.4)]">
-              K
-            </div>
+            <AppLogo className="w-7 h-7 text-[#38BDF8]" />
             <span className="text-[#F1F5F9] font-bold text-base tracking-tight">Knowledge AI</span>
           </Link>
         </div>

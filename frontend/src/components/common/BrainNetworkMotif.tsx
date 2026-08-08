@@ -1,6 +1,6 @@
 // ============================================================
-// BrainNetworkMotif — Active Synaptic Firing Animation
-// Randomized Polling Node Activation, High-Speed Data Packet Inward Travel, & Brain Impact Ripple
+// BrainNetworkMotif.tsx — Hyper-Realistic 3D Anatomical Human Brain
+// Volumetric 3D Interlocking Gyri Folds, Specular Top Highlights, Deep Sulci Shadows, Striated 3D Cerebellum, & Pulsing Neural Synapses
 // ============================================================
 
 import { useState, useEffect } from 'react'
@@ -13,13 +13,13 @@ interface BrainNetworkMotifProps {
 
 // 7 Document Nodes Cable Coordinates (Start: Document -> End: Brain)
 const CABLE_PATHS = [
-  { id: 0, startX: 160, startY: 65, endX: 160, endY: 130, side: 'center', pathD: 'M 160 65 L 160 130' },
-  { id: 1, startX: 83, startY: 75, endX: 140, endY: 135, side: 'left', pathD: 'M 83 75 C 95 80, 120 100, 140 135' },
-  { id: 2, startX: 42, startY: 170, endX: 115, endY: 175, side: 'left', pathD: 'M 42 170 C 60 175, 80 175, 115 175' },
-  { id: 3, startX: 68, startY: 262, endX: 125, endY: 210, side: 'left', pathD: 'M 68 262 C 75 250, 95 230, 125 210' },
-  { id: 4, startX: 237, startY: 75, endX: 180, endY: 135, side: 'right', pathD: 'M 237 75 C 225 80, 200 100, 180 135' },
-  { id: 5, startX: 278, startY: 170, endX: 205, endY: 175, side: 'right', pathD: 'M 278 170 C 260 175, 240 175, 205 175' },
-  { id: 6, startX: 252, startY: 262, endX: 195, endY: 210, side: 'right', pathD: 'M 252 262 C 245 250, 225 230, 195 210' },
+  { id: 0, startX: 160, startY: 65, endX: 160, endY: 110, side: 'center', pathD: 'M 160 65 L 160 110' },
+  { id: 1, startX: 83, startY: 75, endX: 128, endY: 120, side: 'left', pathD: 'M 83 75 C 95 80, 110 94, 128 120' },
+  { id: 2, startX: 42, startY: 170, endX: 100, endY: 175, side: 'left', pathD: 'M 42 170 C 60 175, 76 175, 100 175' },
+  { id: 3, startX: 68, startY: 262, endX: 114, endY: 220, side: 'left', pathD: 'M 68 262 C 75 250, 90 230, 114 220' },
+  { id: 4, startX: 237, startY: 75, endX: 192, endY: 120, side: 'right', pathD: 'M 237 75 C 225 80, 210 94, 192 120' },
+  { id: 5, startX: 278, startY: 170, endX: 220, endY: 175, side: 'right', pathD: 'M 278 170 C 260 175, 244 175, 220 175' },
+  { id: 6, startX: 252, startY: 262, endX: 206, endY: 220, side: 'right', pathD: 'M 252 262 C 245 250, 230 230, 206 220' },
 ]
 
 export function BrainNetworkMotif({ size = 260, className }: BrainNetworkMotifProps) {
@@ -27,22 +27,19 @@ export function BrainNetworkMotif({ size = 260, className }: BrainNetworkMotifPr
   const [firingPacket, setFiringPacket] = useState<{ id: number; pathD: string; startX: number; startY: number; endX: number; endY: number; side: string } | null>(null)
   const [brainImpactSide, setBrainImpactSide] = useState<'left' | 'right' | 'center' | null>(null)
 
-  // Randomized Polling: Selects 1 node every 1.5s - 2.5s
+  // Periodic Polling: Launches a glowing data packet into the brain every 1.8s - 2.5s
   useEffect(() => {
     const triggerFiring = () => {
       const randomIndex = Math.floor(Math.random() * CABLE_PATHS.length)
       const targetCable = CABLE_PATHS[randomIndex]
 
-      // 1. Activate Node
       setActiveNodeIndex(randomIndex)
       setFiringPacket(targetCable)
 
-      // 2. Data Packet Impact at Brain (~350ms after launch)
       setTimeout(() => {
         setBrainImpactSide(targetCable.side as 'left' | 'right' | 'center')
       }, 320)
 
-      // 3. Reset Impact & Active Node
       setTimeout(() => {
         setBrainImpactSide(null)
         setActiveNodeIndex(null)
@@ -50,12 +47,8 @@ export function BrainNetworkMotif({ size = 260, className }: BrainNetworkMotifPr
       }, 650)
     }
 
-    // Initial trigger
-    const initialTimer = setTimeout(triggerFiring, 1000)
-
-    const interval = setInterval(() => {
-      triggerFiring()
-    }, 1800 + Math.random() * 800)
+    const initialTimer = setTimeout(triggerFiring, 800)
+    const interval = setInterval(triggerFiring, 2000)
 
     return () => {
       clearTimeout(initialTimer)
@@ -73,16 +66,43 @@ export function BrainNetworkMotif({ size = 260, className }: BrainNetworkMotifPr
       className={className}
     >
       <defs>
-        {/* CSS Keyframe Animations */}
+        {/* GPU-Optimized Keyframe Animations */}
         <style>{`
+          /* 1. Breathing Outer Glow */
           .brain-glow-breathe {
-            animation: brainBreathe 3.5s ease-in-out infinite alternate;
+            animation: brainBreatheGlow 3.2s ease-in-out infinite alternate;
             transform-origin: 160px 175px;
+            will-change: transform, opacity;
           }
+          @keyframes brainBreatheGlow {
+            0% { opacity: 0.45; transform: scale(0.96); }
+            50% { opacity: 0.75; transform: scale(1.04); }
+            100% { opacity: 0.95; transform: scale(1.08); }
+          }
+
+          /* 2. Continuous Inward Flowing Dashed Lines (Marching Ants) */
           .dash-flow-line {
             stroke-dasharray: 6 5;
-            animation: dashFlowAnim 1.6s linear infinite;
+            animation: dashFlowInward 1.4s linear infinite;
+            will-change: stroke-dashoffset;
           }
+          @keyframes dashFlowInward {
+            0% { stroke-dashoffset: 22; }
+            100% { stroke-dashoffset: 0; }
+          }
+
+          /* 3. Internal Synaptic Firing Nodes */
+          .synapse-node-a { animation: synapsePulse 2.4s ease-in-out infinite alternate; }
+          .synapse-node-b { animation: synapsePulse 3.1s ease-in-out 0.6s infinite alternate; }
+          .synapse-node-c { animation: synapsePulse 2.7s ease-in-out 1.2s infinite alternate; }
+
+          @keyframes synapsePulse {
+            0% { opacity: 0.25; transform: scale(0.85); }
+            50% { opacity: 0.95; transform: scale(1.35); filter: drop-shadow(0 0 6px #38BDF8); }
+            100% { opacity: 0.35; transform: scale(0.95); }
+          }
+
+          /* 4. Floating Document Nodes */
           .doc-node {
             transition: transform 0.25s ease-out, filter 0.25s ease-out;
             cursor: pointer;
@@ -95,14 +115,6 @@ export function BrainNetworkMotif({ size = 260, className }: BrainNetworkMotifPr
           .doc-float-b { animation: floatB 4.2s ease-in-out 0.4s infinite; }
           .doc-float-c { animation: floatC 3.8s ease-in-out 0.8s infinite; }
 
-          @keyframes brainBreathe {
-            0% { opacity: 0.45; transform: scale(1); }
-            100% { opacity: 0.85; transform: scale(1.03); }
-          }
-          @keyframes dashFlowAnim {
-            0% { stroke-dashoffset: 22; }
-            100% { stroke-dashoffset: 0; }
-          }
           @keyframes floatA { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-4px); } }
           @keyframes floatB { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-5px); } }
           @keyframes floatC { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-3px); } }
@@ -110,24 +122,48 @@ export function BrainNetworkMotif({ size = 260, className }: BrainNetworkMotifPr
 
         {/* Ambient Backlight Radial Glow */}
         <radialGradient id="tightBrainGlow" cx="50%" cy="54%" r="50%">
-          <stop offset="0%" stopColor="#60A5FA" stopOpacity="0.5" />
-          <stop offset="65%" stopColor="#3B82F6" stopOpacity="0.15" />
+          <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.80" />
+          <stop offset="50%" stopColor="#3B82F6" stopOpacity="0.40" />
+          <stop offset="85%" stopColor="#1E40AF" stopOpacity="0.15" />
           <stop offset="100%" stopColor="#0A0E1A" stopOpacity="0" />
         </radialGradient>
 
-        {/* Realistic Brain Shading Gradients */}
-        <linearGradient id="tightLeftGrad" x1="115" y1="130" x2="160" y2="220" gradientUnits="userSpaceOnUse">
+        {/* 3D Left Hemisphere Volumetric Gradient */}
+        <radialGradient id="left3DBrainBase" cx="40%" cy="40%" r="60%">
           <stop offset="0%" stopColor="#BAE6FD" />
-          <stop offset="30%" stopColor="#60A5FA" />
-          <stop offset="75%" stopColor="#3B82F6" />
+          <stop offset="35%" stopColor="#38BDF8" />
+          <stop offset="70%" stopColor="#2563EB" />
+          <stop offset="100%" stopColor="#1E3A8A" />
+        </radialGradient>
+
+        {/* 3D Right Hemisphere Volumetric Gradient */}
+        <radialGradient id="right3DBrainBase" cx="60%" cy="40%" r="60%">
+          <stop offset="0%" stopColor="#BAE6FD" />
+          <stop offset="35%" stopColor="#60A5FA" />
+          <stop offset="70%" stopColor="#1D4ED8" />
+          <stop offset="100%" stopColor="#0F172A" />
+        </radialGradient>
+
+        {/* 3D Gyrus Ribbon Fill Gradient */}
+        <linearGradient id="gyrus3DGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#93C5FD" />
+          <stop offset="50%" stopColor="#3B82F6" />
           <stop offset="100%" stopColor="#1D4ED8" />
         </linearGradient>
 
-        <linearGradient id="tightRightGrad" x1="205" y1="130" x2="160" y2="220" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#BAE6FD" />
-          <stop offset="30%" stopColor="#54A4E5" />
-          <stop offset="75%" stopColor="#2563EB" />
-          <stop offset="100%" stopColor="#1E40AF" />
+        {/* Cerebellum 3D Base Gradient */}
+        <linearGradient id="cerebellum3DGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#3B82F6" />
+          <stop offset="50%" stopColor="#1D4ED8" />
+          <stop offset="100%" stopColor="#0F172A" />
+        </linearGradient>
+
+        {/* Brainstem Cylindrical Gradient */}
+        <linearGradient id="brainstemGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#1E3A8A" />
+          <stop offset="40%" stopColor="#60A5FA" />
+          <stop offset="70%" stopColor="#2563EB" />
+          <stop offset="100%" stopColor="#0F172A" />
         </linearGradient>
 
         {/* Document Card Gradients */}
@@ -147,35 +183,38 @@ export function BrainNetworkMotif({ size = 260, className }: BrainNetworkMotifPr
           <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
 
-        {/* Intense Synaptic Flash Filter */}
+        {/* Synaptic Impact Flash Filter */}
         <filter id="synapticFlashGlow" x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="8" result="blur" />
+          <feGaussianBlur stdDeviation="7" result="blur" />
           <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+
+        {/* 3D Drop Shadow Filter for Gyri Convolutions */}
+        <filter id="gyrusShadow" x="-10%" y="-10%" width="130%" height="130%">
+          <feDropShadow dx="1" dy="2" stdDeviation="2" floodColor="#070A14" floodOpacity="0.8" />
         </filter>
       </defs>
 
-      {/* Ambient Pulsing Glow Circle */}
-      <circle cx="160" cy="175" r="115" fill="url(#tightBrainGlow)" className="brain-glow-breathe" />
+      {/* ── 1. AMBIENT PULSING RADIAL GLOW (Soft Breathing Heartbeat) ─────── */}
+      <circle cx="160" cy="175" r="120" fill="url(#tightBrainGlow)" className="brain-glow-breathe" />
 
-      {/* ── 7 RADIATING CONNECTING CABLES ───────────────────────────────── */}
-      <g stroke="#3B82F6" strokeWidth="2" opacity="0.35" strokeLinecap="round">
+      {/* ── 2. RADIATING CONNECTING CABLES (Inward Marching Ants) ──────────── */}
+      <g stroke="#1E3A8A" strokeWidth="2" opacity="0.4" strokeLinecap="round">
         {CABLE_PATHS.map((c) => (
           <path key={c.id} d={c.pathD} />
         ))}
       </g>
 
-      {/* Animated Flow Cable Lines */}
-      <g stroke="#60A5FA" strokeWidth="2.5" strokeLinecap="round" className="dash-flow-line" opacity="0.9">
+      <g stroke="#38BDF8" strokeWidth="2.5" strokeLinecap="round" className="dash-flow-line" opacity="0.95">
         {CABLE_PATHS.map((c) => (
           <path key={c.id} d={c.pathD} />
         ))}
       </g>
 
-      {/* ── HIGH-SPEED SYNAPTIC DATA PACKET SHOOTING INWARD (300ms Travel) ── */}
+      {/* ── 3. HIGH-SPEED SYNAPTIC DATA PACKET INWARD TRAVEL ─────────────── */}
       <AnimatePresence>
         {firingPacket && (
           <g>
-            {/* Glowing Active Cable Line Segment */}
             <motion.path
               d={firingPacket.pathD}
               stroke="#38BDF8"
@@ -187,11 +226,9 @@ export function BrainNetworkMotif({ size = 260, className }: BrainNetworkMotifPr
               transition={{ duration: 0.32, ease: 'easeOut' }}
               filter="url(#tightSoftGlow)"
             />
-
-            {/* Glowing Synaptic Cyan Dot Data Packet */}
             <motion.circle
-              r="4.5"
-              fill="#38BDF8"
+              r="5"
+              fill="#7DD3FC"
               filter="url(#tightSoftGlow)"
               initial={{ cx: firingPacket.startX, cy: firingPacket.startY, opacity: 1, scale: 1.4 }}
               animate={{ cx: firingPacket.endX, cy: firingPacket.endY, opacity: 1, scale: 1 }}
@@ -202,112 +239,185 @@ export function BrainNetworkMotif({ size = 260, className }: BrainNetworkMotifPr
         )}
       </AnimatePresence>
 
-      {/* ── ANATOMICALLY ACCURATE BRAIN (WITH IMPACT RIPPLE FLASH) ─────────── */}
+      {/* ── 4. HYPER-REALISTIC 3D ANATOMICAL HUMAN BRAIN MODEL ────────────── */}
       <motion.g
         filter={brainImpactSide ? 'url(#synapticFlashGlow)' : 'url(#tightSoftGlow)'}
         animate={
           brainImpactSide
             ? {
-                scale: [1, 1.04, 1],
-                filter: [
-                  'brightness(1)',
-                  'brightness(1.5) drop-shadow(0 0 20px #38BDF8)',
-                  'brightness(1)',
-                ],
-              }
+              scale: [1, 1.04, 1],
+              filter: [
+                'brightness(1)',
+                'brightness(1.4) drop-shadow(0 0 24px #38BDF8)',
+                'brightness(1)',
+              ],
+            }
             : {}
         }
         transition={{ duration: 0.28, ease: 'easeInOut' }}
         style={{ transformOrigin: '160px 175px' }}
       >
-        {/* LEFT HEMISPHERE (Highlight on Left Impact) */}
-        <motion.path
-          d="M 157 126
-             C 140 116, 118 122, 107 137
-             C 98 149, 96 163, 103 176
-             C 95 187, 95 202, 102 214
-             C 96 223, 101 237, 114 244
-             C 128 251, 150 246, 157 239 Z"
-          fill="url(#tightLeftGrad)"
+        {/* ── A. 3D BRAINSTEM BASE (Medulla Oblongata) ──────────────────── */}
+        <path
+          d="M 152 238 L 152 258 C 152 262, 156 264, 160 264 C 164 264, 168 262, 168 258 L 168 238 Z"
+          fill="url(#brainstemGrad)"
+          stroke="#38BDF8"
+          strokeWidth="1.5"
+          filter="url(#gyrusShadow)"
+        />
+        <line x1="160" y1="238" x2="160" y2="264" stroke="#E0F2FE" strokeWidth="1.2" opacity="0.6" />
+
+        {/* ── B. 3D CEREBELLUM LOBES (Striated Folia Convolutions) ───────── */}
+        {/* Left Cerebellum Lobe */}
+        <g filter="url(#gyrusShadow)">
+          <path
+            d="M 116 220 C 104 226, 106 242, 120 246 C 134 250, 154 246, 158 238 L 158 226 Z"
+            fill="url(#cerebellum3DGrad)"
+            stroke="#38BDF8"
+            strokeWidth="1.6"
+          />
+          {/* 3D Striated Folia Ribbons */}
+          <path d="M 118 226 C 130 232, 144 228, 156 233" stroke="#BAE6FD" strokeWidth="1.8" strokeLinecap="round" opacity="0.8" />
+          <path d="M 122 233 C 134 238, 146 235, 156 239" stroke="#BAE6FD" strokeWidth="1.8" strokeLinecap="round" opacity="0.8" />
+          <path d="M 126 240 C 136 244, 148 242, 156 244" stroke="#7DD3FC" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
+        </g>
+
+        {/* Right Cerebellum Lobe */}
+        <g filter="url(#gyrusShadow)">
+          <path
+            d="M 204 220 C 216 226, 214 242, 200 246 C 186 250, 166 246, 162 238 L 162 226 Z"
+            fill="url(#cerebellum3DGrad)"
+            stroke="#38BDF8"
+            strokeWidth="1.6"
+          />
+          {/* 3D Striated Folia Ribbons */}
+          <path d="M 202 226 C 190 232, 176 228, 164 233" stroke="#BAE6FD" strokeWidth="1.8" strokeLinecap="round" opacity="0.8" />
+          <path d="M 198 233 C 186 238, 174 235, 164 239" stroke="#BAE6FD" strokeWidth="1.8" strokeLinecap="round" opacity="0.8" />
+          <path d="M 194 240 C 184 244, 172 242, 164 244" stroke="#7DD3FC" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
+        </g>
+
+        {/* ── C. 3D CEREBRAL HEMISPHERES SILHOUETTE BASE ─────────────────── */}
+        {/* Left Hemisphere Base */}
+        <path
+          d="M 160 108
+             C 142 103, 118 110, 102 124
+             C 86 138, 82 158, 86 178
+             C 82 194, 86 210, 96 222
+             C 106 232, 120 238, 136 238
+             C 146 238, 154 234, 158 226 Z"
+          fill="url(#left3DBrainBase)"
           stroke={brainImpactSide === 'left' ? '#38BDF8' : '#E0F2FE'}
           strokeWidth={brainImpactSide === 'left' ? 3 : 2}
-          animate={brainImpactSide === 'left' ? { opacity: [1, 0.7, 1] } : {}}
         />
 
-        {/* LEFT INTERLOCKING GYRI GROOVES */}
-        <g stroke="#0F172A" strokeWidth="2.2" strokeLinecap="round" opacity="0.38">
-          <path d="M 116 142 C 131 149, 146 141, 156 150" />
-          <path d="M 104 161 C 121 161, 136 170, 156 166" />
-          <path d="M 103 182 C 121 179, 137 190, 156 184" />
-          <path d="M 106 203 C 121 199, 138 210, 156 204" />
-          <path d="M 116 224 C 129 231, 144 222, 156 226" />
-        </g>
-
-        {/* 3D Depth Highlight (Left) */}
-        <path d="M 112 142 C 126 135, 145 131, 155 133" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" opacity="0.6" />
-
-        {/* RIGHT HEMISPHERE (Highlight on Right Impact) */}
-        <motion.path
-          d="M 163 126
-             C 180 116, 202 122, 213 137
-             C 222 149, 224 163, 217 176
-             C 225 187, 225 202, 218 214
-             C 224 223, 219 237, 206 244
-             C 192 251, 170 246, 163 239 Z"
-          fill="url(#tightRightGrad)"
+        {/* Right Hemisphere Base */}
+        <path
+          d="M 160 108
+             C 178 103, 202 110, 218 124
+             C 234 138, 238 158, 234 178
+             C 238 194, 234 210, 224 222
+             C 214 232, 200 238, 184 238
+             C 174 238, 166 234, 162 226 Z"
+          fill="url(#right3DBrainBase)"
           stroke={brainImpactSide === 'right' ? '#38BDF8' : '#E0F2FE'}
           strokeWidth={brainImpactSide === 'right' ? 3 : 2}
-          animate={brainImpactSide === 'right' ? { opacity: [1, 0.7, 1] } : {}}
         />
 
-        {/* RIGHT INTERLOCKING GYRI GROOVES */}
-        <g stroke="#0F172A" strokeWidth="2.2" strokeLinecap="round" opacity="0.38">
-          <path d="M 204 142 C 189 149, 174 141, 164 150" />
-          <path d="M 216 161 C 199 161, 184 170, 164 166" />
-          <path d="M 217 182 C 199 179, 183 190, 164 184" />
-          <path d="M 214 203 C 199 199, 182 210, 164 204" />
-          <path d="M 204 224 C 191 231, 176 222, 164 226" />
+        {/* ── D. INTERLOCKING 3D VOLUMETRIC GYRI FOLDS (Cerebral Ribbons) ─── */}
+
+        {/* LEFT HEMISPHERE 3D GYRI FOLDS */}
+        <g filter="url(#gyrusShadow)">
+          {/* Superior Frontal Gyrus 3D Ribbon */}
+          <path d="M 158 110 C 142 108, 126 114, 114 126 C 128 132, 144 128, 158 134 Z" fill="url(#gyrus3DGrad)" stroke="#090D16" strokeWidth="1.8" />
+          <path d="M 154 112 C 140 110, 128 116, 118 125" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" opacity="0.8" />
+
+          {/* Middle Frontal Gyrus 3D Ribbon */}
+          <path d="M 114 126 C 104 134, 98 144, 106 150 C 122 144, 138 148, 158 142 Z" fill="url(#gyrus3DGrad)" stroke="#090D16" strokeWidth="1.8" />
+          <path d="M 116 128 C 108 134, 102 142, 108 148" stroke="#FFFFFF" strokeWidth="2.0" strokeLinecap="round" opacity="0.75" />
+
+          {/* Precentral & Postcentral Gyri 3D Ribbons */}
+          <path d="M 106 150 C 94 156, 88 166, 94 174 C 114 168, 134 178, 158 166 Z" fill="url(#gyrus3DGrad)" stroke="#090D16" strokeWidth="1.8" />
+          <path d="M 104 152 C 96 158, 92 166, 96 172" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" opacity="0.8" />
+
+          {/* Superior & Middle Temporal Gyri 3D Ribbons */}
+          <path d="M 94 174 C 88 184, 90 196, 100 204 C 118 198, 136 206, 158 194 Z" fill="url(#gyrus3DGrad)" stroke="#090D16" strokeWidth="1.8" />
+          <path d="M 94 176 C 90 184, 92 194, 100 200" stroke="#FFFFFF" strokeWidth="2.0" strokeLinecap="round" opacity="0.75" />
+
+          {/* Inferior Temporal & Occipital Gyri 3D Ribbons */}
+          <path d="M 100 204 C 108 214, 122 224, 138 226 C 146 226, 154 220, 158 212 C 140 216, 120 212, 100 204 Z" fill="url(#gyrus3DGrad)" stroke="#090D16" strokeWidth="1.8" />
+          <path d="M 104 206 C 112 214, 124 222, 136 224" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" opacity="0.8" />
         </g>
 
-        {/* 3D Depth Highlight (Right) */}
-        <path d="M 208 142 C 194 135, 175 131, 165 133" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" opacity="0.6" />
+        {/* RIGHT HEMISPHERE 3D GYRI FOLDS */}
+        <g filter="url(#gyrusShadow)">
+          {/* Superior Frontal Gyrus 3D Ribbon */}
+          <path d="M 162 110 C 178 108, 194 114, 206 126 C 192 132, 176 128, 162 134 Z" fill="url(#gyrus3DGrad)" stroke="#090D16" strokeWidth="1.8" />
+          <path d="M 166 112 C 180 110, 192 116, 202 125" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" opacity="0.8" />
 
-        {/* Central Division Line */}
-        <line x1="160" y1="122" x2="160" y2="242" stroke="#FFFFFF" strokeWidth="2.5" opacity="0.95" />
+          {/* Middle Frontal Gyrus 3D Ribbon */}
+          <path d="M 206 126 C 216 134, 222 144, 214 150 C 198 144, 182 148, 162 142 Z" fill="url(#gyrus3DGrad)" stroke="#090D16" strokeWidth="1.8" />
+          <path d="M 204 128 C 212 134, 218 142, 212 148" stroke="#FFFFFF" strokeWidth="2.0" strokeLinecap="round" opacity="0.75" />
+
+          {/* Precentral & Postcentral Gyri 3D Ribbons */}
+          <path d="M 214 150 C 226 156, 232 166, 226 174 C 206 168, 186 178, 162 166 Z" fill="url(#gyrus3DGrad)" stroke="#090D16" strokeWidth="1.8" />
+          <path d="M 216 152 C 224 158, 228 166, 224 172" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" opacity="0.8" />
+
+          {/* Superior & Middle Temporal Gyri 3D Ribbons */}
+          <path d="M 226 174 C 232 184, 230 196, 220 204 C 202 198, 184 206, 162 194 Z" fill="url(#gyrus3DGrad)" stroke="#090D16" strokeWidth="1.8" />
+          <path d="M 226 176 C 230 184, 228 194, 220 200" stroke="#FFFFFF" strokeWidth="2.0" strokeLinecap="round" opacity="0.75" />
+
+          {/* Inferior Temporal & Occipital Gyri 3D Ribbons */}
+          <path d="M 220 204 C 212 214, 198 224, 182 226 C 174 226, 166 220, 162 212 C 180 216, 200 212, 220 204 Z" fill="url(#gyrus3DGrad)" stroke="#090D16" strokeWidth="1.8" />
+          <path d="M 216 206 C 208 214, 196 222, 184 224" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" opacity="0.8" />
+        </g>
+
+        {/* Central Longitudinal Fissure (3D Division Line) */}
+        <line x1="160" y1="108" x2="160" y2="238" stroke="#FFFFFF" strokeWidth="2.8" opacity="0.95" />
+
+        {/* ── E. ILLUMINATED NEURAL SYNAPTIC NETWORKS INSIDE 3D BRAIN ────── */}
+        <g id="synaptic-nodes">
+          {/* Left Hemisphere Synapses */}
+          <circle cx="130" cy="122" r="3.0" fill="#FFFFFF" className="synapse-node-a" />
+          <circle cx="110" cy="144" r="3.4" fill="#7DD3FC" className="synapse-node-b" />
+          <circle cx="134" cy="164" r="2.8" fill="#FFFFFF" className="synapse-node-c" />
+          <circle cx="112" cy="186" r="3.2" fill="#38BDF8" className="synapse-node-a" />
+          <circle cx="136" cy="208" r="2.8" fill="#FFFFFF" className="synapse-node-b" />
+
+          {/* Right Hemisphere Synapses */}
+          <circle cx="190" cy="122" r="3.0" fill="#FFFFFF" className="synapse-node-b" />
+          <circle cx="210" cy="144" r="3.4" fill="#7DD3FC" className="synapse-node-a" />
+          <circle cx="186" cy="164" r="2.8" fill="#FFFFFF" className="synapse-node-c" />
+          <circle cx="208" cy="186" r="3.2" fill="#38BDF8" className="synapse-node-b" />
+          <circle cx="184" cy="208" r="2.8" fill="#FFFFFF" className="synapse-node-a" />
+
+          {/* Interconnect Neural Threads */}
+          <path d="M 130 122 L 134 164 L 136 208" stroke="#BAE6FD" strokeWidth="1.4" strokeDasharray="2 2" opacity="0.75" />
+          <path d="M 190 122 L 186 164 L 184 208" stroke="#BAE6FD" strokeWidth="1.4" strokeDasharray="2 2" opacity="0.75" />
+        </g>
       </motion.g>
 
-      {/* ── IMPACT RIPPLE WAVE (Emits from Brain on Packet Impact) ──────── */}
+      {/* ── 5. SYNAPTIC IMPACT RIPPLE FLASH ──────────────────────────────── */}
       <AnimatePresence>
         {brainImpactSide && (
           <motion.circle
-            cx={brainImpactSide === 'left' ? 135 : brainImpactSide === 'right' ? 185 : 160}
-            cy="175"
+            cx={brainImpactSide === 'left' ? 128 : brainImpactSide === 'right' ? 192 : 160}
+            cy="172"
             r="15"
             fill="none"
             stroke="#38BDF8"
             strokeWidth="2.5"
             initial={{ r: 15, opacity: 0.9 }}
-            animate={{ r: 48, opacity: 0 }}
+            animate={{ r: 54, opacity: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.35, ease: 'easeOut' }}
           />
         )}
       </AnimatePresence>
 
-      {/* ── ALL 7 SEPARATED DOCUMENT CARDS (WITH RANDOMIZED ACTIVE FIRING) ── */}
-
-      {/* 1. Top Center Document (Index 0) */}
+      {/* ── 6. UNTOUCHED DOCUMENT CARDS ──────────────────────────────────── */}
+      {/* Top Center Document */}
       <g transform="translate(142, 20)" className="doc-node">
-        <motion.g
-          className="doc-float-a"
-          animate={
-            activeNodeIndex === 0
-              ? { scale: 1.15, filter: 'drop-shadow(0 0 18px #38BDF8)' }
-              : { scale: 1, filter: 'drop-shadow(0 0 0px transparent)' }
-          }
-          transition={{ duration: 0.3 }}
-          style={{ transformOrigin: '18px 22px' }}
-        >
+        <motion.g className="doc-float-a" animate={activeNodeIndex === 0 ? { scale: 1.15, filter: 'drop-shadow(0 0 18px #38BDF8)' } : { scale: 1 }}>
           <rect x="0" y="0" width="36" height="44" rx="5" fill="url(#tightDocLightGrad)" stroke="#FFFFFF" strokeWidth="1.5" />
           <path d="M 26 0 L 36 10 L 26 10 Z" fill="#3B82F6" />
           <rect x="6" y="10" width="18" height="2.5" rx="1" fill="#1D4ED8" />
@@ -317,18 +427,9 @@ export function BrainNetworkMotif({ size = 260, className }: BrainNetworkMotifPr
         </motion.g>
       </g>
 
-      {/* 2. Top Left Document (Index 1) */}
+      {/* Top Left Document */}
       <g transform="translate(65, 35)" className="doc-node">
-        <motion.g
-          className="doc-float-b"
-          animate={
-            activeNodeIndex === 1
-              ? { scale: 1.15, filter: 'drop-shadow(0 0 18px #38BDF8)' }
-              : { scale: 1, filter: 'drop-shadow(0 0 0px transparent)' }
-          }
-          transition={{ duration: 0.3 }}
-          style={{ transformOrigin: '18px 22px' }}
-        >
+        <motion.g className="doc-float-b" animate={activeNodeIndex === 1 ? { scale: 1.15, filter: 'drop-shadow(0 0 18px #38BDF8)' } : { scale: 1 }}>
           <rect x="0" y="0" width="36" height="44" rx="5" fill="url(#tightDocLightGrad)" stroke="#FFFFFF" strokeWidth="1.5" />
           <path d="M 26 0 L 36 10 L 26 10 Z" fill="#3B82F6" />
           <rect x="6" y="10" width="18" height="2.5" rx="1" fill="#1D4ED8" />
@@ -338,36 +439,18 @@ export function BrainNetworkMotif({ size = 260, className }: BrainNetworkMotifPr
         </motion.g>
       </g>
 
-      {/* 3. Mid-Left Document (PSC) (Index 2) */}
+      {/* Mid-Left Document (PSC) */}
       <g transform="translate(22, 145)" className="doc-node">
-        <motion.g
-          className="doc-float-c"
-          animate={
-            activeNodeIndex === 2
-              ? { scale: 1.15, filter: 'drop-shadow(0 0 18px #38BDF8)' }
-              : { scale: 1, filter: 'drop-shadow(0 0 0px transparent)' }
-          }
-          transition={{ duration: 0.3 }}
-          style={{ transformOrigin: '19px 23px' }}
-        >
+        <motion.g className="doc-float-c" animate={activeNodeIndex === 2 ? { scale: 1.15, filter: 'drop-shadow(0 0 18px #38BDF8)' } : { scale: 1 }}>
           <rect x="0" y="0" width="38" height="46" rx="5" fill="url(#tightDocMedGrad)" stroke="#FFFFFF" strokeWidth="1.5" />
           <path d="M 28 0 L 38 10 L 28 10 Z" fill="#93C5FD" />
           <text x="19" y="28" fill="#FFFFFF" fontSize="9" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">PSC</text>
         </motion.g>
       </g>
 
-      {/* 4. Bottom Left Document (Index 3) */}
+      {/* Bottom Left Document */}
       <g transform="translate(50, 245)" className="doc-node">
-        <motion.g
-          className="doc-float-a"
-          animate={
-            activeNodeIndex === 3
-              ? { scale: 1.15, filter: 'drop-shadow(0 0 18px #38BDF8)' }
-              : { scale: 1, filter: 'drop-shadow(0 0 0px transparent)' }
-          }
-          transition={{ duration: 0.3 }}
-          style={{ transformOrigin: '18px 22px' }}
-        >
+        <motion.g className="doc-float-a" animate={activeNodeIndex === 3 ? { scale: 1.15, filter: 'drop-shadow(0 0 18px #38BDF8)' } : { scale: 1 }}>
           <rect x="0" y="0" width="36" height="44" rx="5" fill="url(#tightDocLightGrad)" stroke="#FFFFFF" strokeWidth="1.5" />
           <path d="M 26 0 L 36 10 L 26 10 Z" fill="#3B82F6" />
           <rect x="6" y="10" width="18" height="2.5" rx="1" fill="#1D4ED8" />
@@ -377,36 +460,18 @@ export function BrainNetworkMotif({ size = 260, className }: BrainNetworkMotifPr
         </motion.g>
       </g>
 
-      {/* 5. Top Right Document (PDF) (Index 4) */}
+      {/* Top Right Document (PDF) */}
       <g transform="translate(215, 35)" className="doc-node">
-        <motion.g
-          className="doc-float-b"
-          animate={
-            activeNodeIndex === 4
-              ? { scale: 1.15, filter: 'drop-shadow(0 0 18px #38BDF8)' }
-              : { scale: 1, filter: 'drop-shadow(0 0 0px transparent)' }
-          }
-          transition={{ duration: 0.3 }}
-          style={{ transformOrigin: '19px 23px' }}
-        >
+        <motion.g className="doc-float-b" animate={activeNodeIndex === 4 ? { scale: 1.15, filter: 'drop-shadow(0 0 18px #38BDF8)' } : { scale: 1 }}>
           <rect x="0" y="0" width="38" height="46" rx="5" fill="url(#tightDocMedGrad)" stroke="#FFFFFF" strokeWidth="1.5" />
           <path d="M 28 0 L 38 10 L 28 10 Z" fill="#93C5FD" />
           <text x="19" y="28" fill="#FFFFFF" fontSize="9" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">PDF</text>
         </motion.g>
       </g>
 
-      {/* 6. Mid Right Document (Index 5) */}
+      {/* Mid Right Document */}
       <g transform="translate(258, 145)" className="doc-node">
-        <motion.g
-          className="doc-float-c"
-          animate={
-            activeNodeIndex === 5
-              ? { scale: 1.15, filter: 'drop-shadow(0 0 18px #38BDF8)' }
-              : { scale: 1, filter: 'drop-shadow(0 0 0px transparent)' }
-          }
-          transition={{ duration: 0.3 }}
-          style={{ transformOrigin: '18px 22px' }}
-        >
+        <motion.g className="doc-float-c" animate={activeNodeIndex === 5 ? { scale: 1.15, filter: 'drop-shadow(0 0 18px #38BDF8)' } : { scale: 1 }}>
           <rect x="0" y="0" width="36" height="44" rx="5" fill="url(#tightDocLightGrad)" stroke="#FFFFFF" strokeWidth="1.5" />
           <path d="M 26 0 L 36 10 L 26 10 Z" fill="#3B82F6" />
           <rect x="6" y="10" width="18" height="2.5" rx="1" fill="#1D4ED8" />
@@ -416,18 +481,9 @@ export function BrainNetworkMotif({ size = 260, className }: BrainNetworkMotifPr
         </motion.g>
       </g>
 
-      {/* 7. Bottom Right Document (Index 6) */}
+      {/* Bottom Right Document */}
       <g transform="translate(230, 245)" className="doc-node">
-        <motion.g
-          className="doc-float-a"
-          animate={
-            activeNodeIndex === 6
-              ? { scale: 1.15, filter: 'drop-shadow(0 0 18px #38BDF8)' }
-              : { scale: 1, filter: 'drop-shadow(0 0 0px transparent)' }
-          }
-          transition={{ duration: 0.3 }}
-          style={{ transformOrigin: '18px 22px' }}
-        >
+        <motion.g className="doc-float-a" animate={activeNodeIndex === 6 ? { scale: 1.15, filter: 'drop-shadow(0 0 18px #38BDF8)' } : { scale: 1 }}>
           <rect x="0" y="0" width="36" height="44" rx="5" fill="url(#tightDocLightGrad)" stroke="#FFFFFF" strokeWidth="1.5" />
           <path d="M 26 0 L 36 10 L 26 10 Z" fill="#3B82F6" />
           <rect x="6" y="10" width="18" height="2.5" rx="1" fill="#1D4ED8" />

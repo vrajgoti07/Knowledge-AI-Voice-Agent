@@ -12,6 +12,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useAuthStore } from '@/store/authStore'
 import { cn, storage } from '@/utils'
 import { APP_NAME, ROUTES } from '@/constants'
+import { AppLogo } from '@/components/common/AppLogo'
 
 // ── Smooth scroll helper ──────────────────────────────────────
 function scrollTo(id: string, closeMobile?: () => void) {
@@ -35,9 +36,7 @@ export function PublicHeader() {
         <div className="flex items-center justify-between h-full gap-4">
           {/* Logo Far-Left */}
           <Link to="/" className="flex items-center gap-2.5 shrink-0 group">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#38BDF8] to-[#3B82F6] text-[#0F172A] flex items-center justify-center font-extrabold text-sm shadow-[0_0_15px_rgba(56,189,248,0.4)] group-hover:scale-105 transition-transform">
-              K
-            </div>
+            <AppLogo className="w-7 h-7 text-[#38BDF8] group-hover:scale-105 transition-transform" />
             <span className="text-[#F1F5F9] font-bold text-base tracking-tight group-hover:text-[#38BDF8] transition-colors">
               {APP_NAME}
             </span>

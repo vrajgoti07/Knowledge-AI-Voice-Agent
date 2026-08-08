@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
 import { Mail, ShieldCheck, ArrowLeft, ArrowRight, CheckCircle2, KeyRound, Sparkles } from 'lucide-react'
 import { ROUTES, APP_NAME } from '@/constants'
+import { AppLogo } from '@/components/common/AppLogo'
 import { BrainNetworkMotif } from '@/components/common/BrainNetworkMotif'
 
 const MATRIX_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#@$&*%'
@@ -244,9 +245,7 @@ export default function ForgotPasswordPage() {
       {/* ── TOP NAV HEADER ───────────────────────────────────────────── */}
       <header className="w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between z-20 relative">
         <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#38BDF8] to-[#3B82F6] text-white flex items-center justify-center font-bold text-base shadow-lg shadow-[#38BDF8]/20 group-hover:scale-105 transition-transform">
-            K
-          </div>
+          <AppLogo className="w-8 h-8 text-[#38BDF8] group-hover:scale-105 transition-transform" />
           <span className="text-[#F1F5F9] font-bold text-lg tracking-tight group-hover:text-[#38BDF8] transition-colors">
             {APP_NAME}
           </span>

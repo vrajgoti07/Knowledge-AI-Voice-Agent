@@ -12,6 +12,7 @@ import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/store/uiStore'
 import { apiPost } from '@/services/api'
 import { ROUTES, APP_NAME } from '@/constants'
+import { AppLogo } from '@/components/common/AppLogo'
 import type { User as UserType } from '@/types'
 
 interface AuthPortalPageProps {
@@ -240,9 +241,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
         {/* Top Header Row */}
         <div className="relative z-10 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#38BDF8] to-[#3B82F6] text-white flex items-center justify-center font-bold text-base shadow-md">
-              K
-            </div>
+            <AppLogo className="w-8 h-8 text-[#38BDF8] group-hover:scale-105 transition-transform" />
             <span className="text-[#F1F5F9] font-bold text-lg tracking-tight group-hover:text-[#38BDF8] transition-colors">
               {APP_NAME}
             </span>
@@ -313,9 +312,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
         {/* Header / Top Nav */}
         <div className="flex items-center justify-between pb-6">
           <div className="flex items-center gap-2.5 lg:hidden">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#38BDF8] to-[#3B82F6] text-white flex items-center justify-center font-bold text-base">
-              K
-            </div>
+            <AppLogo className="w-8 h-8 text-[#38BDF8]" />
             <span className="text-[#F1F5F9] font-bold text-lg">{APP_NAME}</span>
           </div>
 

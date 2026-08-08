@@ -4,6 +4,7 @@
 
 import { motion } from 'framer-motion'
 import { APP_NAME } from '@/constants'
+import { AppLogo } from '@/components/common/AppLogo'
 
 export function PageLoader() {
   return (
@@ -16,17 +17,12 @@ export function PageLoader() {
         {/* Logo */}
         <motion.div
           animate={{
-            boxShadow: [
-              '0 0 0px rgba(114,242,174,0)',
-              '0 0 32px rgba(114,242,174,0.4)',
-              '0 0 0px rgba(114,242,174,0)',
-            ],
+            scale: [0.95, 1.1, 0.95],
+            opacity: [0.7, 1, 0.7],
           }}
           transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-          className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-green to-accent-blue
-                     flex items-center justify-center"
         >
-          <span className="text-bg-primary font-bold text-2xl font-mono">K</span>
+          <AppLogo className="w-14 h-14 text-[#38BDF8]" />
         </motion.div>
 
         {/* Spinner dots */}
