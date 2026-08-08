@@ -1,0 +1,278 @@
+@import "tailwindcss";
+
+/* ============================================================
+   TAILWIND v4 THEME — Knowledge AI (Exact Master Design System)
+   Page BG:       #0A0E1A (Deep Navy-Black)
+   Sidebar BG:    #0D1220 (Slightly distinct, 1px right border)
+   Card BG:       #121A2C (Card/Panel background)
+   Card Hover:    #16213A
+   Border Subtle: #1E293B (1px subtle border)
+   Primary Accent:#3B82F6 (Primary buttons, active states, links)
+   Primary Hover: #2563EB
+   Accent Light:  #60A5FA (Icon tints, chart lines, highlights)
+   Accent Glow:   #93C5FD (Illustration highlights, node glow)
+   Text Primary:  #F1F5F9 (Headings, high emphasis)
+   Text Secondary:#94A3B8 (Body copy, descriptions)
+   Text Muted:    #64748B (Timestamps, captions)
+   Success:       #22C55E
+   Warning:       #F59E0B
+   Danger:        #EF4444
+   ============================================================ */
+@theme {
+  /* ── Breakpoints ──────────────────────────────────────── */
+  --breakpoint-xs:  320px;
+  --breakpoint-sm:  375px;
+  --breakpoint-md:  768px;
+  --breakpoint-lg:  1024px;
+  --breakpoint-xl:  1280px;
+  --breakpoint-2xl: 1440px;
+
+  /* ── Core Color Tokens ────────────────────────────────── */
+  --color-bg-page:       #0A0E1A;
+  --color-bg-sidebar:    #0D1220;
+  --color-bg-card:       #121A2C;
+  --color-bg-card-hover: #16213A;
+
+  --color-border-subtle: #1E293B;
+
+  --color-accent-primary:      #3B82F6;
+  --color-accent-primary-hover:#2563EB;
+  --color-accent-light:        #60A5FA;
+  --color-accent-glow:         #93C5FD;
+
+  --color-text-primary:   #F1F5F9;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted:     #64748B;
+
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-danger:  #EF4444;
+
+  /* Legacy & Shadcn Aliases */
+  --color-bg-primary:   #0A0E1A;
+  --color-bg-secondary: #0D1220;
+  --color-border:        #1E293B;
+  --color-primary:       #3B82F6;
+  --color-primary-hover: #2563EB;
+  --color-background:    #0A0E1A;
+  --color-foreground:    #F1F5F9;
+  --color-card:          #121A2C;
+
+  /* ── Fonts ───────────────────────────────────────────── */
+  --font-family-sans: 'Plus Jakarta Sans', 'Manrope', system-ui, -apple-system, sans-serif;
+  --font-family-mono: 'JetBrains Mono', monospace;
+
+  /* ── Border Radius ───────────────────────────────────── */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* ── Hairline Shadows ────────────────────────────────── */
+  --shadow-card:       none;
+  --shadow-card-hover: 0 4px 20px 0 rgba(59, 130, 246, 0.12);
+
+  /* ── Functional Animations ────────────────────────────── */
+  --animate-fade-in: fadeIn 0.3s ease forwards;
+  --animate-fade-up: fadeUp 0.4s ease forwards;
+  --animate-pulse-slow: pulseSlow 3s infinite ease-in-out;
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulseSlow {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50%      { transform: scale(1.05); opacity: 1; }
+  }
+}
+
+/* ============================================================
+   LIGHT MODE OVERRIDES (Inverted Token Structure)
+   ============================================================ */
+.light {
+  --color-bg-page:       #F8FAFC;
+  --color-bg-sidebar:    #FFFFFF;
+  --color-bg-card:       #FFFFFF;
+  --color-bg-card-hover: #F1F5F9;
+
+  --color-border-subtle: #E2E8F0;
+
+  --color-accent-primary:      #2563EB;
+  --color-accent-primary-hover:#1D4ED8;
+  --color-accent-light:        #3B82F6;
+  --color-accent-glow:         #60A5FA;
+
+  --color-text-primary:   #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted:     #64748B;
+
+  --color-bg-primary:   #F8FAFC;
+  --color-bg-secondary: #FFFFFF;
+  --color-border:        #E2E8F0;
+  --color-primary:       #2563EB;
+  --color-background:    #F8FAFC;
+  --color-foreground:    #0F172A;
+  --color-card:          #FFFFFF;
+}
+
+/* ============================================================
+   BASE RESET & TYPOGRAPHY
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  font-size: 16px;
+  line-height: 1.6;
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-color: var(--color-bg-page);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+::selection {
+  background-color: rgba(59, 130, 246, 0.3);
+  color: #FFFFFF;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar            { width: 6px; height: 6px; }
+::-webkit-scrollbar-track      { background: transparent; }
+::-webkit-scrollbar-thumb      { background: #1E293B; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover{ background: #3B82F6; }
+
+/* Focus Ring */
+:focus-visible {
+  outline: 2px solid #60A5FA;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.outline-none:focus,
+.outline-none:focus-visible,
+[class*="outline-none"]:focus,
+[class*="outline-none"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Typography Scale */
+h1 {
+  color: var(--color-text-primary);
+  font-family: var(--font-family-sans);
+  font-weight: 600;
+  font-size: clamp(32px, 5vw, 48px);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  color: var(--color-text-primary);
+  font-family: var(--font-family-sans);
+  font-weight: 600;
+  font-size: clamp(22px, 3vw, 28px);
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+h3 {
+  color: var(--color-text-primary);
+  font-family: var(--font-family-sans);
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+body, p {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+
+.caption, .eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* Card Base */
+.card {
+  border-radius: 16px;
+  background-color: var(--color-bg-card);
+  border: 1px solid var(--color-border-subtle);
+  padding: 24px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.card:hover {
+  border-color: #3B82F6;
+  background-color: var(--color-bg-card-hover);
+}
+
+/* Tabular Nums */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Reduced Motion Respect */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   BROWSER AUTOFILL OVERRIDE
+   Chrome/Edge inject a bright white bg on autofilled inputs.
+   The box-shadow inset trick paints over that white bg with
+   our dark color. transition-delay: 99999s prevents flash.
+   color-scheme: dark forces the browser's native autofill
+   UI elements to use dark mode.
+   ============================================================ */
+
+/* Force dark color scheme on inputs globally */
+input, textarea, select {
+  color-scheme: dark;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-transition: background-color 99999s ease-in-out 0s, color 99999s ease-in-out 0s;
+  transition: background-color 99999s ease-in-out 0s, color 99999s ease-in-out 0s;
+  -webkit-text-fill-color: #F1F5F9 !important;
+  -webkit-box-shadow: 0 0 0px 2000px #18212f inset !important;
+  box-shadow: 0 0 0px 2000px #18212f inset !important;
+  caret-color: #38BDF8 !important;
+  background-color: #18212f !important;
+  color: #F1F5F9 !important;
+}
+
+
