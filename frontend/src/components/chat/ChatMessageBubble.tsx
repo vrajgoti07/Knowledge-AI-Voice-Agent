@@ -143,14 +143,44 @@ export function ChatMessageBubble({ message, index }: Props) {
     }
 
     window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(textToSpeak)
-    utterance.rate = 1.0
-    utterance.pitch = 1.0
-    utterance.onend = () => setIsPlaying(false)
-    utterance.onerror = () => setIsPlaying(false)
 
-    window.speechSynthesis.speak(utterance)
+    const clean = textToSpeak
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/\[\d+\]/g, '')
+      .replace(/[*_#`~]/g, '')
+      .replace(/\|/g, ' ')
+      .replace(/-{3,}/g, '')
+      .replace(/\n+/g, '. ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    if (!clean) return
+
+    const rawSentences = clean.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0)
+    if (rawSentences.length === 0) return
+
     setIsPlaying(true)
+    let currentIndex = 0
+
+    const speakNext = () => {
+      if (currentIndex >= rawSentences.length) {
+        setIsPlaying(false)
+        return
+      }
+
+      const sentence = rawSentences[currentIndex]
+      currentIndex++
+
+      const utterance = new SpeechSynthesisUtterance(sentence)
+      utterance.rate = 1.0
+      utterance.pitch = 1.0
+      utterance.onend = () => speakNext()
+      utterance.onerror = () => setIsPlaying(false)
+
+      window.speechSynthesis.speak(utterance)
+    }
+
+    speakNext()
   }
 
   return (

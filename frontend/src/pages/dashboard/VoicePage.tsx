@@ -426,20 +426,50 @@ export default function VoicePage() {
     window.speechSynthesis.cancel()
 
     const clean = text
+      .replace(/```[\s\S]*?```/g, '')
       .replace(/\[\d+\]/g, '')
       .replace(/[*_#`~]/g, '')
+      .replace(/\|/g, ' ')
+      .replace(/-{3,}/g, '')
       .replace(/\n+/g, '. ')
+      .replace(/\s+/g, ' ')
       .trim()
 
-    const utt = new SpeechSynthesisUtterance(clean)
-    utt.rate = 1.0
-    utt.pitch = 1.0
-    utt.lang = 'en-US'
+    if (!clean) { onEnd?.(); return }
 
-    utt.onend = () => { activeUtteranceRef.current = null; onEnd?.() }
-    utt.onerror = () => { activeUtteranceRef.current = null; onEnd?.() }
-    activeUtteranceRef.current = utt
-    window.speechSynthesis.speak(utt)
+    const rawSentences = clean.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0)
+    if (rawSentences.length === 0) { onEnd?.(); return }
+
+    let currentIndex = 0
+
+    const speakNextSentence = () => {
+      if (!isSessionActiveRef.current || currentIndex >= rawSentences.length) {
+        activeUtteranceRef.current = null
+        onEnd?.()
+        return
+      }
+
+      const sentence = rawSentences[currentIndex]
+      currentIndex++
+
+      const utt = new SpeechSynthesisUtterance(sentence)
+      utt.rate = 1.0
+      utt.pitch = 1.0
+      utt.lang = 'en-US'
+
+      utt.onend = () => {
+        speakNextSentence()
+      }
+      utt.onerror = () => {
+        activeUtteranceRef.current = null
+        onEnd?.()
+      }
+
+      activeUtteranceRef.current = utt
+      window.speechSynthesis.speak(utt)
+    }
+
+    speakNextSentence()
   }
 
   const startListening = () => {

@@ -258,6 +258,30 @@ def sanitize_answer_text(text: str) -> str:
     return t.strip()
 
 
+def build_speech_text(text: str) -> str:
+    """
+    Converts Markdown answer text into clean, natural spoken prose for Text-to-Speech (TTS).
+    Removes Markdown syntax, code blocks, tables, and citation markers while preserving full content.
+    """
+    if not text:
+        return ""
+    t = text
+    t = re.sub(r'```[\s\S]*?```', '', t)
+    t = re.sub(r'\[\d+\]', '', t)
+    t = re.sub(r'\(\s*Page\s+\d+\s*\)', '', t, flags=re.IGNORECASE)
+    t = re.sub(r'\[\s*Source:\s*[^\]]+\]', '', t, flags=re.IGNORECASE)
+    t = re.sub(r'^#{1,6}\s+', '', t, flags=re.MULTILINE)
+    t = re.sub(r'\|', ' ', t)
+    t = re.sub(r'-{3,}', '', t)
+    t = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', t)
+    t = re.sub(r'_{1,2}([^_]+)_{1,2}', r'\1', t)
+    t = re.sub(r'^\s*[\d\.\-\*]+\s+', '', t, flags=re.MULTILINE)
+    t = re.sub(r'\n+', '. ', t)
+    t = re.sub(r'\s+', ' ', t).strip()
+    t = re.sub(r'\.\s*\.', '.', t)
+    return t
+
+
 def _format_consequences_table(raw_text: str) -> str:
     """Converts stage-consequence pairs into a clean, properly spaced Markdown table."""
     if "|" in raw_text and "---" in raw_text:
@@ -268,17 +292,12 @@ def _format_consequences_table(raw_text: str) -> str:
         "| Stage | Consequence of Poor Execution |",
         "| --- | --- |",
         "| Problem Formulation | Solving the wrong problem; model is technically successful but delivers no real value |",
-        "| Data Collection | Biased or unrepresentative model; poor performance for underrepresented groups |",
-        "| Data Understanding (EDA) | Undetected data corruption or data leakage leading to false confidence |",
-        "| Data Preprocessing | Train-test contamination, invalid scaling, or loss of information |",
-        "| Feature Engineering | Low predictive signal or inclusion of target-leaking features |",
-        "| Model Selection | Underfitting or severe overfitting from inappropriate model family |",
-        "| Training & Validation | Hyperparameter tuning on test set; invalid cross-validation scheme |",
-        "| Hyperparameter Tuning | Overfitting to validation set |",
-        "| Evaluation | Relying on wrong metric (e.g. accuracy on imbalanced data) |",
-        "| Deployment | Silent API failures, unexpected latencies, or environment mismatch |",
-        "| Monitoring | Undetected model drift or data drift causing performance degradation |",
-        "| Maintenance | Technical debt accumulation; inability to rollback or update model |"
+        "| Data Collection & Labeling | Garbage in, garbage out; biased or noisy datasets severely cap performance |",
+        "| Feature Engineering | Model struggles to extract signals; requires excessive model complexity |",
+        "| Model Training | Overfitting or underfitting; poor hyperparameter tuning |",
+        "| Model Evaluation | Misleading metrics (e.g. high accuracy on imbalanced data) lead to flawed deployment |",
+        "| Deployment | High latency, infrastructure crashes, or deployment pipeline breakage |",
+        "| Monitoring & Maintenance | Model drift over time degrades performance silently in production |",
     ]
     return "\n".join(table_rows)
 
@@ -286,8 +305,8 @@ def _format_consequences_table(raw_text: str) -> str:
 def format_fallback_chunks(
     chunks: List[Dict[str, Any]],
     query: str = "",
-    max_chunks: int = 50,
-) -> Dict[str, str]:
+    max_chunks: int = 5,
+) -> Dict[str, Any]:
     """
     Format retrieved chunks into a clean, direct, citation-free fallback response.
     Supports complete process/workflow responses in section order without truncation or raw section numbers.
@@ -310,7 +329,6 @@ def format_fallback_chunks(
 
         intro_line = "Here is the complete end-to-end Machine Learning Workflow:\n\n"
         list_items = []
-        speech_stages = []
 
         for idx, c in enumerate(sorted_chunks, 1):
             raw = c.get("content", "")
@@ -328,8 +346,6 @@ def format_fallback_chunks(
             if (sec_num and "7.13" in str(sec_num)) or "Consequences of Poor Execution" in str(clean_title) or ("|" in raw and "---" in raw):
                 table_block = _format_consequences_table(raw)
                 list_items.append(f"**{idx}. {clean_title}**\n\n{table_block}")
-                if idx <= 4:
-                    speech_stages.append(f"Step {idx}: {clean_title}")
                 continue
 
             # Standard prose section — extract 2-3 sentence informative summary
@@ -341,24 +357,17 @@ def format_fallback_chunks(
 
             list_items.append(f"**{idx}. {clean_title}**\n   {summary}")
 
-            if idx <= 4:
-                speech_stages.append(f"Step {idx}: {clean_title}")
-
         closing_line = "\n\nLet me know if you would like deeper details on any specific stage."
         full_answer = intro_line + "\n\n".join(list_items) + closing_line
-        speech_text = (
-            "Here is the complete process overview: " + ", ".join(speech_stages) +
-            f", and {len(sorted_chunks) - min(4, len(sorted_chunks))} additional steps."
-        )
+        clean_ans = sanitize_answer_text(full_answer)
 
         return {
-            "answer": sanitize_answer_text(full_answer),
-            "speech_text": speech_text[:500],
+            "answer": clean_ans,
+            "speech_text": build_speech_text(clean_ans),
         }
 
     # Standard (non-workflow) fallback assembly — NO inline citations or section numbers
     sections: List[str] = []
-    speech_parts: List[str] = []
     quick_answer: Optional[str] = None
 
     for idx, c in enumerate(chunks[:5]):
@@ -382,11 +391,6 @@ def format_fallback_chunks(
 
         if idx == 0 and not is_code:
             quick_answer = _extract_quick_answer(pre_clean, query)
-            if quick_answer:
-                speech_parts.append(quick_answer)
-            else:
-                sentences = re.split(r'(?<=[.!?])\s+', content_display.strip())
-                speech_parts.append(" ".join(sentences[:2]))
 
         sections.append(content_display)
 
@@ -399,14 +403,11 @@ def format_fallback_chunks(
     quick_block = f"**Quick Answer:** {quick_answer}\n\n" if quick_answer else ""
     joined = "\n\n---\n\n".join(sections)
     display_answer = f"{quick_block}{joined}"
-
-    speech_text = (
-        " ".join(speech_parts) if speech_parts else "I found relevant information in your documents."
-    )
+    clean_ans = sanitize_answer_text(display_answer)
 
     return {
-        "answer": sanitize_answer_text(display_answer),
-        "speech_text": speech_text[:500],
+        "answer": clean_ans,
+        "speech_text": build_speech_text(clean_ans),
     }
 
 
@@ -550,7 +551,7 @@ def generate_answer(
             elapsed = time.time() - t0
             logger.info(f"[LLM] Gemini answered in {elapsed:.2f}s (query: '{query[:50]}')")
             clean_answer = sanitize_answer_text(result)
-            speech_text = sanitize_answer_text(result)[:500]
+            speech_text = build_speech_text(clean_answer)
             return {
                 "answer": clean_answer,
                 "speech_text": speech_text,
