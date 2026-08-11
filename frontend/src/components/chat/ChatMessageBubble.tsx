@@ -1,13 +1,16 @@
 // ============================================================
-// ChatMessageBubble — Clean Document Canvas Layout
-// Removes all [1], [2] citation tags and renders markdown prose with GFM table support
+// ChatMessageBubble — Rich Document Canvas Layout
+// Renders markdown prose with GFM tables, KaTeX math, and clean formatting
 // User Prompt: Prominent heading text-xl font-semibold text-white
-// AI Response: Typeset document, Volume2 TTS audio playback button, clean markdown prose
+// AI Response: Typeset document with math, tables, code blocks, and TTS
 // ============================================================
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
 import { Sparkles, Copy, Check, Volume2, VolumeX } from 'lucide-react'
 
 export interface Message {
@@ -37,10 +40,10 @@ function sanitizeText(content: string): string {
     .trim()
 }
 
-// Markdown components for clean typeset prose & GFM tables
+// Markdown components for rich typeset prose, GFM tables, and math
 const mdComponents: Record<string, React.FC<any>> = {
   p: ({ children }) => (
-    <p className="text-base text-slate-300 leading-loose mb-4 last:mb-0 font-normal">{children}</p>
+    <p className="text-[15px] text-slate-300 leading-[1.85] mb-4 last:mb-0 font-normal">{children}</p>
   ),
   strong: ({ children }) => (
     <strong className="text-white font-semibold">{children}</strong>
@@ -49,40 +52,73 @@ const mdComponents: Record<string, React.FC<any>> = {
     <em className="text-slate-400 italic">{children}</em>
   ),
   h1: ({ children }) => (
-    <h1 className="text-lg font-bold text-white mt-6 mb-3 first:mt-0 tracking-tight">{children}</h1>
+    <h1 className="text-xl font-bold text-white mt-8 mb-4 first:mt-0 tracking-tight border-b border-white/[0.06] pb-2">{children}</h1>
   ),
   h2: ({ children }) => (
-    <h2 className="text-base font-bold text-white mt-5 mb-2 first:mt-0 tracking-tight">{children}</h2>
+    <h2 className="text-lg font-bold text-white mt-7 mb-3 first:mt-0 tracking-tight">{children}</h2>
   ),
   h3: ({ children }) => (
-    <h3 className="text-sm font-bold text-sky-300 tracking-wide mt-4 mb-2 first:mt-0">{children}</h3>
+    <h3 className="text-base font-semibold text-sky-300 tracking-wide mt-5 mb-2 first:mt-0">{children}</h3>
+  ),
+  h4: ({ children }) => (
+    <h4 className="text-sm font-semibold text-sky-200 mt-4 mb-2 first:mt-0">{children}</h4>
   ),
   ul: ({ children }) => (
-    <ul className="space-y-2 my-4 ml-1">{children}</ul>
+    <ul className="space-y-1.5 my-4 ml-1">{children}</ul>
   ),
-  ol: ({ children }) => (
-    <ol className="space-y-2 my-4 ml-4 list-decimal text-slate-300">{children}</ol>
+  ol: ({ children, start }) => (
+    <ol className="space-y-1.5 my-4 ml-1 list-none counter-reset-list" start={start}>{children}</ol>
   ),
-  li: ({ children }) => (
-    <li className="flex gap-2 text-base text-slate-300 leading-loose">
-      <span className="text-sky-400 mt-1 shrink-0 font-bold">•</span>
-      <span className="flex-1">{children}</span>
-    </li>
-  ),
-  code: ({ inline, children }: any) =>
-    inline ? (
-      <code className="px-1.5 py-0.5 rounded bg-white/[0.06] text-sky-300 text-xs font-mono border border-white/10">
-        {children}
-      </code>
-    ) : (
-      <pre className="my-4 p-4 rounded-xl bg-slate-900/80 border border-white/10 overflow-x-auto">
-        <code className="text-xs font-mono text-slate-300 leading-relaxed">{children}</code>
+  li: ({ children, node, ordered, index: liIndex }) => {
+    // Detect if parent is an ordered list by checking the node's parent or the ordered prop
+    const isOrdered = ordered === true || (node?.position && false) // react-markdown passes 'ordered' prop
+    if (isOrdered) {
+      return (
+        <li className="flex gap-2.5 text-[15px] text-slate-300 leading-[1.85]">
+          <span className="text-sky-400 shrink-0 font-semibold min-w-[1.5em] text-right">{typeof liIndex === 'number' ? `${liIndex + 1}.` : '•'}</span>
+          <span className="flex-1">{children}</span>
+        </li>
+      )
+    }
+    return (
+      <li className="flex gap-2.5 text-[15px] text-slate-300 leading-[1.85]">
+        <span className="text-sky-400 mt-[2px] shrink-0">•</span>
+        <span className="flex-1">{children}</span>
+      </li>
+    )
+  },
+  code: ({ inline, className, children }: any) => {
+    // Detect language from className (e.g., "language-python")
+    const match = /language-(\w+)/.exec(className || '')
+    const lang = match ? match[1] : ''
+
+    if (inline) {
+      return (
+        <code className="px-1.5 py-0.5 rounded bg-white/[0.07] text-sky-300 text-[13px] font-mono border border-white/10">
+          {children}
+        </code>
+      )
+    }
+    return (
+      <pre className="my-5 rounded-xl bg-[#0d1117] border border-white/10 overflow-x-auto shadow-lg">
+        {lang && (
+          <div className="px-4 py-2 text-[11px] font-mono text-slate-500 border-b border-white/[0.06] bg-white/[0.02]">
+            {lang}
+          </div>
+        )}
+        <code className={`block px-4 py-3 text-[13px] font-mono text-slate-300 leading-relaxed ${className || ''}`}>
+          {children}
+        </code>
       </pre>
-    ),
+    )
+  },
   blockquote: ({ children }) => (
-    <blockquote className="my-3 pl-3 border-l-2 border-sky-400/40 text-slate-400 text-base leading-loose">
+    <blockquote className="my-4 pl-4 border-l-2 border-sky-400/40 text-slate-400 text-[15px] leading-[1.85] bg-sky-500/[0.03] py-2 rounded-r-lg">
       {children}
     </blockquote>
+  ),
+  hr: () => (
+    <hr className="my-6 border-0 border-t border-white/[0.08]" />
   ),
   table: ({ children }) => (
     <div className="my-6 w-full overflow-x-auto rounded-xl border border-white/10 bg-slate-900/80 shadow-xl">
@@ -95,16 +131,22 @@ const mdComponents: Record<string, React.FC<any>> = {
     </thead>
   ),
   tbody: ({ children }) => (
-    <tbody className="divide-y divide-white/10">{children}</tbody>
+    <tbody className="divide-y divide-white/[0.06]">{children}</tbody>
   ),
   tr: ({ children }) => (
     <tr className="hover:bg-white/[0.04] transition-colors">{children}</tr>
   ),
   th: ({ children }) => (
-    <th className="px-4 py-3 font-semibold text-sky-300 border-b border-white/10">{children}</th>
+    <th className="px-4 py-3 font-semibold text-sky-300 border-b border-white/10 whitespace-nowrap">{children}</th>
   ),
   td: ({ children }) => (
     <td className="px-4 py-3 text-slate-300 leading-relaxed align-top">{children}</td>
+  ),
+  sup: ({ children }) => (
+    <sup className="text-sky-300">{children}</sup>
+  ),
+  sub: ({ children }) => (
+    <sub className="text-sky-300">{children}</sub>
   ),
 }
 
@@ -146,6 +188,8 @@ export function ChatMessageBubble({ message, index }: Props) {
 
     const clean = textToSpeak
       .replace(/```[\s\S]*?```/g, '')
+      .replace(/\$\$[\s\S]*?\$\$/g, '')     // Remove display math for TTS
+      .replace(/\$[^$]+\$/g, '')              // Remove inline math for TTS
       .replace(/\[\d+\]/g, '')
       .replace(/[*_#`~]/g, '')
       .replace(/\|/g, ' ')
@@ -247,12 +291,16 @@ export function ChatMessageBubble({ message, index }: Props) {
             </div>
           </div>
 
-          {/* Typeset Document Body (Clean prose without [1] or standalone dots) */}
-          <div className="text-base text-slate-300 leading-loose">
+          {/* Typeset Document Body — Rich markdown with math, tables, code */}
+          <div className="ai-prose text-[15px] text-slate-300 leading-[1.85]">
             {message.error ? (
               <p className="text-sm text-red-400 font-medium">{message.error}</p>
             ) : (
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents as any}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeKatex]}
+                components={mdComponents as any}
+              >
                 {cleanContent}
               </ReactMarkdown>
             )}

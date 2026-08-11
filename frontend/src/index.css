@@ -275,4 +275,73 @@ select:-webkit-autofill:focus {
   color: #F1F5F9 !important;
 }
 
+/* ============================================================
+   KaTeX Math Dark Mode Overrides
+   Makes mathematical expressions readable on dark backgrounds
+   ============================================================ */
+.katex {
+  color: #E2E8F0 !important;
+  font-size: 1.05em;
+}
+
+.katex .base {
+  color: #E2E8F0 !important;
+}
+
+.katex .mord,
+.katex .mop,
+.katex .mrel,
+.katex .mbin,
+.katex .mpunct,
+.katex .mopen,
+.katex .mclose,
+.katex .minner {
+  color: #E2E8F0 !important;
+}
+
+/* Display math ($$...$$) — centered block equations */
+.katex-display {
+  margin: 1.25rem 0 !important;
+  padding: 1rem 1.5rem;
+  background: rgba(14, 165, 233, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.katex-display > .katex {
+  font-size: 1.15em;
+  color: #F1F5F9 !important;
+}
+
+/* Inline math ($...$) — subtle highlight */
+.katex-html {
+  white-space: nowrap;
+}
+
+/* ============================================================
+   AI Prose Container Styles
+   Fine-tunes the rendered markdown within AI response bubbles
+   ============================================================ */
+.ai-prose > :first-child {
+  margin-top: 0 !important;
+}
+
+.ai-prose > :last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Ensure links in AI responses are styled */
+.ai-prose a {
+  color: #60A5FA;
+  text-decoration: underline;
+  text-decoration-color: rgba(96, 165, 250, 0.3);
+  text-underline-offset: 2px;
+  transition: text-decoration-color 0.15s ease;
+}
+
+.ai-prose a:hover {
+  text-decoration-color: #60A5FA;
+}
 

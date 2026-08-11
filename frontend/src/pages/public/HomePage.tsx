@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { Button, Card, Badge, Modal } from '@/components/ui'
 import { BrainNetworkMotif } from '@/components/common/BrainNetworkMotif'
+import { KnowledgeGraph3D } from '@/components/home/KnowledgeGraph3D'
 import { TopographicalGrid } from '@/components/home/TopographicalGrid'
 import { ROUTES } from '@/constants'
 
@@ -501,9 +502,9 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Brain/Network Motif Right (5 cols) — NEURAL PULSE BREATHING & INWARD DASHFLOW */}
-              <div className="md:col-span-5 flex flex-col items-center justify-center p-4 rounded-xl bg-[#0A0E1A]/50 border border-[#1E293B]/50 text-center">
-                <BrainNetworkMotif size={250} />
+              {/* 3D Animated Knowledge Graph Right (5 cols) */}
+              <div className="md:col-span-5 flex flex-col items-center justify-center p-4 rounded-xl bg-[#0A0E1A]/50 border border-[#1E293B]/50 text-center overflow-hidden">
+                <KnowledgeGraph3D size={260} />
                 <span className="text-[11px] text-[#64748B] font-mono mt-2">100+ Connected Knowledge Nodes</span>
               </div>
             </div>

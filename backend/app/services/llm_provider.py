@@ -108,13 +108,14 @@ def clean_chunk_text(text: str, max_chars: int = 500) -> str:
     s = re.sub(r'(\w+)-\s*\n\s*([a-z]\w*)', r'\1\2', s)
     lines = s.splitlines()
     clean_lines = [ln for ln in lines if not _is_boilerplate_line(ln)]
-    s = ' '.join(clean_lines)
-    s = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', s)
-    s = re.sub(r'_{1,2}([^_]+)_{1,2}', r'\1', s)
+    s = '\n'.join(clean_lines)
+    # Preserve markdown formatting (bold, italic) — do NOT strip it
     s = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\uf000-\uffff]', '', s)
     # Strip leading section numbers e.g. "7.1 Problem Formulation" -> "Problem Formulation"
     s = re.sub(r'^(?:Chapter|Module|Part|Section)?\s*\d+(?:\.\d+)*\s*[:\-\u2013\u2014]?\s*', '', s, flags=re.IGNORECASE)
-    s = re.sub(r'\s+', ' ', s).strip()
+    s = re.sub(r'[ \t]+', ' ', s).strip()
+    # Collapse excessive blank lines but preserve paragraph structure
+    s = re.sub(r'\n{3,}', '\n\n', s)
 
     if not s:
         return ''
@@ -261,12 +262,18 @@ def sanitize_answer_text(text: str) -> str:
 def build_speech_text(text: str) -> str:
     """
     Converts Markdown answer text into clean, natural spoken prose for Text-to-Speech (TTS).
-    Removes Markdown syntax, code blocks, tables, and citation markers while preserving full content.
+    Removes Markdown syntax, code blocks, LaTeX math, tables, and citation markers while preserving full content.
     """
     if not text:
         return ""
     t = text
     t = re.sub(r'```[\s\S]*?```', '', t)
+    t = re.sub(r'\$\$[\s\S]*?\$\$', '', t)           # Remove display math blocks
+    t = re.sub(r'\$([^$]+)\$', r'\1', t)              # Inline math: keep content, strip $ delimiters
+    t = re.sub(r'\\frac\{([^}]*)\}\{([^}]*)\}', r'\1 over \2', t)  # \frac{a}{b} -> "a over b"
+    t = re.sub(r'\\(?:mathbb|mathrm|text)\{([^}]*)\}', r'\1', t)   # \mathbb{R} -> R
+    t = re.sub(r'\\(?:sum|int|prod|sqrt|infty|alpha|beta|gamma|delta|theta|lambda|sigma|pi|mu|epsilon|omega)', '', t)
+    t = re.sub(r'[\\^_{}]', ' ', t)                   # Remove remaining LaTeX control chars
     t = re.sub(r'\[\d+\]', '', t)
     t = re.sub(r'\(\s*Page\s+\d+\s*\)', '', t, flags=re.IGNORECASE)
     t = re.sub(r'\[\s*Source:\s*[^\]]+\]', '', t, flags=re.IGNORECASE)
@@ -425,10 +432,23 @@ def _build_rag_prompt(query: str, context_str: str) -> str:
         "Synthesize the answer clearly and comprehensively in your own words.\n\n"
         "FORMATTING RULES (follow strictly):\n"
         "- Do NOT include raw document section numbers (e.g. 7.1, 7.2, Chapter 7), page numbers, or bracketed citations anywhere in your response text.\n"
-        "- Use clean concept titles as bold step headers with a simple sequential numbered list (1, 2, 3...).\n"
-        "- Use clear markdown: headings (##), bullet points (-), bold (**text**).\n"
-        "- If the source contains a table, render it as a clean Markdown table (| Col1 | Col2 |).\n"
-        "- For code examples, ALWAYS wrap in fenced code blocks with the correct language tag.\n"
+        "- Structure your response with a clear hierarchy using markdown:\n"
+        "  • Use ## for main section headings\n"
+        "  • Use ### for sub-section headings\n"
+        "  • Use **bold text** for key terms and concept names\n"
+        "  • Use bullet points (-) or numbered lists (1. 2. 3.) for listing items\n"
+        "- TABLES: When comparing items or listing properties, ALWAYS use a proper GFM Markdown table:\n"
+        "  | Column 1 | Column 2 | Column 3 |\n"
+        "  | --- | --- | --- |\n"
+        "  | data | data | data |\n"
+        "  Tables must have a header row and a separator row with dashes.\n"
+        "- MATHEMATICS: For any mathematical expressions, formulas, or equations:\n"
+        "  • Use inline LaTeX with single dollar signs: $A = A^T$ for inline math\n"
+        "  • Use display LaTeX with double dollar signs for standalone equations:\n"
+        "    $$Q^TQ = QQ^T = I$$\n"
+        "  • Always use proper LaTeX notation: superscripts (^), subscripts (_), \\frac{}{}, \\sum, \\int, \\mathbb{R}, etc.\n"
+        "  • NEVER write math as plain text like 'AT' for transpose — always use $A^T$\n"
+        "- CODE: Always wrap code in fenced code blocks with the correct language tag (```python, ```javascript, etc.)\n"
         "- Keep answers direct, complete, professional, and easy to read.\n\n"
         f"DOCUMENT EXCERPTS:\n{context_str}\n\n"
         f"USER QUESTION:\n{query}"
@@ -441,8 +461,18 @@ def _build_general_prompt(query: str) -> str:
         f"Answer this question clearly and accurately: {query}\n\n"
         "FORMATTING RULES (follow strictly):\n"
         "- Do NOT include raw document section numbers, page numbers, or bracketed citations anywhere in your response text.\n"
-        "- Use clear markdown: headings (##), bullet points (-), bold (**text**), numbered lists where appropriate.\n"
-        "- For code examples, ALWAYS use fenced code blocks with language tags.\n"
+        "- Structure your response with a clear hierarchy using markdown:\n"
+        "  • Use ## for main section headings\n"
+        "  • Use ### for sub-section headings\n"
+        "  • Use **bold text** for key terms and concept names\n"
+        "  • Use bullet points (-) or numbered lists (1. 2. 3.) for listing items\n"
+        "- TABLES: When comparing items or listing properties, ALWAYS use a proper GFM Markdown table with header and separator rows.\n"
+        "- MATHEMATICS: For any mathematical expressions, formulas, or equations:\n"
+        "  • Use inline LaTeX: $expression$ for inline math\n"
+        "  • Use display LaTeX: $$expression$$ for standalone equations\n"
+        "  • Use proper LaTeX notation: ^, _, \\frac{}{}, \\sum, \\int, \\mathbb{R}, etc.\n"
+        "  • NEVER write math as plain text — always use LaTeX notation\n"
+        "- CODE: Always wrap code in fenced code blocks with language tags.\n"
         "- Keep answers well-structured, professional, and easy to read."
     )
 
