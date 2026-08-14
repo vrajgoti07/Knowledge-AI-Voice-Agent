@@ -30,15 +30,15 @@ interface Props {
   index: number
 }
 
-// Clean text function to strip [1], [2] tags and standalone periods
+// Clean text function to strip leftover system metadata and standalone periods
 function sanitizeText(content: string): string {
   if (!content) return ''
   return content
-    .replace(/\[\d+\]/g, '')               // Remove numeric citation markers [1], [2]
     .replace(/\n\s*\.\s*\n/g, '\n')         // Remove standalone dot on its own line
     .replace(/From:\s*[^\n]+/g, '')          // Remove leftover From: lines
     .trim()
 }
+
 
 // Markdown components for rich typeset prose, GFM tables, and math
 const mdComponents: Record<string, React.FC<any>> = {

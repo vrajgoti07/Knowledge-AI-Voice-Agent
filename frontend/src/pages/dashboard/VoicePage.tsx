@@ -11,6 +11,10 @@ import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
+
 import {
   Mic, MicOff, PhoneOff, AlertCircle, Loader2, AudioLines, VolumeX
 } from 'lucide-react'
@@ -324,7 +328,7 @@ function KaraokeMarkdown({
             : undefined
         }
       >
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{cleanText}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={mdComponents}>{cleanText}</ReactMarkdown>
       </div>
     </div>
   )

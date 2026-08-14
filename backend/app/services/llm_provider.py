@@ -244,19 +244,20 @@ def _parse_section_sort_key(chunk: Dict[str, Any]) -> Tuple[int, int, int, int]:
 
 def sanitize_answer_text(text: str) -> str:
     """
-    Strips ALL visible page/source/document citations and raw section numbers from user-facing answer text.
-    Removes [1], [2], (Page X), From: ..., [Source: ...] while leaving natural prose & GFM Markdown tables intact.
+    Strips raw section numbers and leftover system metadata from user-facing answer text.
+    Preserves inline citation markers [1], [2] and GFM Markdown formatting.
     """
     if not text:
         return ""
     t = text
-    t = re.sub(r'\[\d+\]', '', t)                               # [1], [2]
+    # Preserve [1], [2] citation markers — do NOT strip them
     t = re.sub(r'\(\s*Page\s+\d+\s*\)', '', t, flags=re.IGNORECASE)  # (Page 38)
     t = re.sub(r'\*\s*From:\s*[^*\n]+\*', '', t)                # *From: ...*
     t = re.sub(r'From:\s*[^\n]+', '', t)                         # From: ...
     t = re.sub(r'\[\s*Source:\s*[^\]]+\]', '', t, flags=re.IGNORECASE) # [Source: ...]
     t = re.sub(r'\n\s*\.\s*\n', '\n', t)
     return t.strip()
+
 
 
 def build_speech_text(text: str) -> str:
@@ -425,55 +426,96 @@ def _get_timeout() -> float:
     return _TIMEOUT
 
 
-def _build_rag_prompt(query: str, context_str: str) -> str:
+def classify_question_llm(query: str) -> Optional[str]:
+    """Issues a fast Gemini call to classify an ambiguous question into one of the 6 core types."""
+    prompt = (
+        "Classify the following user question into EXACTLY ONE of these categories: "
+        "DEFINITION, EXPLANATION, LIST, COMPARISON, FORMULA, SUMMARY.\n\n"
+        "Categories:\n"
+        "- DEFINITION: Asking 'what is X', 'define X'\n"
+        "- EXPLANATION: Asking 'explain X', 'how does X work', 'why does X happen'\n"
+        "- LIST: Asking to list items, types, steps, or methods\n"
+        "- COMPARISON: Asking to compare two concepts or find differences\n"
+        "- FORMULA: Asking for a math formula, equation, or calculation\n"
+        "- SUMMARY: Asking to summarize a document, chapter, or topic\n\n"
+        f"Question: {query}\n"
+        "Output ONLY the category name in capital letters."
+    )
+    res = _call_gemini(prompt)
+    if res:
+        cleaned = res.strip().upper()
+        for cat in ["DEFINITION", "EXPLANATION", "LIST", "COMPARISON", "FORMULA", "SUMMARY"]:
+            if cat in cleaned:
+                return cat
+    return None
+
+
+_TYPE_INSTRUCTIONS: Dict[str, str] = {
+    "DEFINITION": (
+        "QUESTION TYPE: DEFINITION ('what is X', 'define X')\n"
+        "INSTRUCTION: Answer in 2-4 concise, direct sentences. Do NOT provide a full topic overview unless explicitly requested. "
+        "Do NOT use markdown headers (##). Strict maximum length: 80 words."
+    ),
+    "EXPLANATION": (
+        "QUESTION TYPE: EXPLANATION ('explain X', 'how does X work', 'why does X happen')\n"
+        "INSTRUCTION: Provide a structured multi-paragraph answer with a brief introduction, followed by organized sub-points. "
+        "Use markdown headers (##) ONLY if there are multiple distinct sub-topics. Strict maximum length: 250 words unless the topic genuinely requires more."
+    ),
+    "LIST": (
+        "QUESTION TYPE: LIST/STEPS ('list the types of X', 'steps to do X')\n"
+        "INSTRUCTION: Provide a clean numbered or bulleted list with minimal introductory or concluding prose around it. "
+        "Strict maximum length: 150 words unless the list itself is inherently long."
+    ),
+    "COMPARISON": (
+        "QUESTION TYPE: COMPARISON ('difference between X and Y', 'compare X and Y')\n"
+        "INSTRUCTION: Provide a side-by-side bullet comparison or a clean GFM markdown table comparing the concepts."
+    ),
+    "FORMULA": (
+        "QUESTION TYPE: FORMULA/CALCULATION ('formula for X', 'how do you calculate X')\n"
+        "INSTRUCTION: Present the mathematical formula or equation FIRST using proper LaTeX ($formula$ or $$formula$$), "
+        "followed by a short, plain-language explanation of each term/variable."
+    ),
+    "SUMMARY": (
+        "QUESTION TYPE: SUMMARY ('summarize this document/chapter')\n"
+        "INSTRUCTION: Provide a structured summary with clear markdown headers (##) for major sections."
+    ),
+}
+
+_STANDARD_FORMATTING_RULES = (
+    "STANDARD FORMATTING RULES (apply strictly to all answers):\n"
+    "- Bold key terms ONLY the first time they are introduced — do NOT bold every occurrence.\n"
+    "- Use bullet points (-) or numbered lists (1. 2. 3.) for any enumerable information (types, steps, causes, examples) — NEVER write a wall of prose when content is naturally list-shaped.\n"
+    "- Use markdown headers (##) ONLY for SUMMARY-type or long EXPLANATION answers with multiple distinct sub-topics — NEVER for short DEFINITION answers.\n"
+    "- CITATION PLACEMENT: Place citation markers [1], [2] IMMEDIATELY after the specific claim or fact they support (e.g., 'Backpropagation calculates gradients using the chain rule [1].'), NOT all bunched at the end of paragraphs or answers.\n"
+    "- SOURCES LINE: End every answer with a single 'Sources:' line listing ONLY the document titles actually cited in your response (e.g., 'Sources: [1] Machine Learning Overview, [2] Neural Networks Guide'), not every document in the knowledge base.\n"
+    "- MATHEMATICS & FORMULAS:\n"
+    "  • Source text extracted from PDFs may contain garbled or malformed mathematical notation due to PDF extraction limitations. When you recognize a standard formula (e.g. gradient descent, Bayes' theorem, cross-entropy loss) from context even if extracted text is imperfect, reconstruct it correctly using proper LaTeX notation rather than reproducing the garbled text.\n"
+    "  • Always wrap math in standard LaTeX delimiters: inline math as $formula$ (e.g. $E = mc^2$), block equations as $$formula$$\n"
+    "  • Use proper LaTeX notation: superscripts (^), subscripts (_), \\frac{}{}, \\sum, \\int, \\nabla, \\theta, \\mathbb{R}, etc.\n"
+    "  • NEVER write math as plain text like 'AT' for transpose — always use $A^T$\n"
+    "- CODE: Always wrap code in fenced code blocks with language tags (```python, ```javascript, etc.)"
+)
+
+
+def _build_rag_prompt(query: str, context_str: str, question_type: str = "EXPLANATION") -> str:
+    type_instruction = _TYPE_INSTRUCTIONS.get(question_type, _TYPE_INSTRUCTIONS["EXPLANATION"])
     return (
-        "You are Knowledge AI, an expert research assistant. "
-        "Answer the user's question using ONLY the provided document excerpts as your source of truth. "
-        "Synthesize the answer clearly and comprehensively in your own words.\n\n"
-        "FORMATTING RULES (follow strictly):\n"
-        "- Do NOT include raw document section numbers (e.g. 7.1, 7.2, Chapter 7), page numbers, or bracketed citations anywhere in your response text.\n"
-        "- Structure your response with a clear hierarchy using markdown:\n"
-        "  • Use ## for main section headings\n"
-        "  • Use ### for sub-section headings\n"
-        "  • Use **bold text** for key terms and concept names\n"
-        "  • Use bullet points (-) or numbered lists (1. 2. 3.) for listing items\n"
-        "- TABLES: When comparing items or listing properties, ALWAYS use a proper GFM Markdown table:\n"
-        "  | Column 1 | Column 2 | Column 3 |\n"
-        "  | --- | --- | --- |\n"
-        "  | data | data | data |\n"
-        "  Tables must have a header row and a separator row with dashes.\n"
-        "- MATHEMATICS: For any mathematical expressions, formulas, or equations:\n"
-        "  • Use inline LaTeX with single dollar signs: $A = A^T$ for inline math\n"
-        "  • Use display LaTeX with double dollar signs for standalone equations:\n"
-        "    $$Q^TQ = QQ^T = I$$\n"
-        "  • Always use proper LaTeX notation: superscripts (^), subscripts (_), \\frac{}{}, \\sum, \\int, \\mathbb{R}, etc.\n"
-        "  • NEVER write math as plain text like 'AT' for transpose — always use $A^T$\n"
-        "- CODE: Always wrap code in fenced code blocks with the correct language tag (```python, ```javascript, etc.)\n"
-        "- Keep answers direct, complete, professional, and easy to read.\n\n"
+        "You are Knowledge AI, an expert research assistant.\n"
+        "Answer the user's question using ONLY the provided document excerpts as your source of truth.\n\n"
+        f"{type_instruction}\n\n"
+        f"{_STANDARD_FORMATTING_RULES}\n\n"
         f"DOCUMENT EXCERPTS:\n{context_str}\n\n"
         f"USER QUESTION:\n{query}"
     )
 
 
-def _build_general_prompt(query: str) -> str:
+def _build_general_prompt(query: str, question_type: str = "EXPLANATION") -> str:
+    type_instruction = _TYPE_INSTRUCTIONS.get(question_type, _TYPE_INSTRUCTIONS["EXPLANATION"])
     return (
-        "You are Knowledge AI, an expert assistant. "
+        "You are Knowledge AI, an expert assistant.\n"
         f"Answer this question clearly and accurately: {query}\n\n"
-        "FORMATTING RULES (follow strictly):\n"
-        "- Do NOT include raw document section numbers, page numbers, or bracketed citations anywhere in your response text.\n"
-        "- Structure your response with a clear hierarchy using markdown:\n"
-        "  • Use ## for main section headings\n"
-        "  • Use ### for sub-section headings\n"
-        "  • Use **bold text** for key terms and concept names\n"
-        "  • Use bullet points (-) or numbered lists (1. 2. 3.) for listing items\n"
-        "- TABLES: When comparing items or listing properties, ALWAYS use a proper GFM Markdown table with header and separator rows.\n"
-        "- MATHEMATICS: For any mathematical expressions, formulas, or equations:\n"
-        "  • Use inline LaTeX: $expression$ for inline math\n"
-        "  • Use display LaTeX: $$expression$$ for standalone equations\n"
-        "  • Use proper LaTeX notation: ^, _, \\frac{}{}, \\sum, \\int, \\mathbb{R}, etc.\n"
-        "  • NEVER write math as plain text — always use LaTeX notation\n"
-        "- CODE: Always wrap code in fenced code blocks with language tags.\n"
-        "- Keep answers well-structured, professional, and easy to read."
+        f"{type_instruction}\n\n"
+        f"{_STANDARD_FORMATTING_RULES}"
     )
 
 
@@ -549,18 +591,20 @@ def generate_answer(
     query: str,
     retrieved_chunks: List[Dict[str, Any]],
     zero_chunk_mode: bool = False,
+    question_type: str = "EXPLANATION",
 ) -> Dict[str, Any]:
     t0 = time.time()
 
     if zero_chunk_mode or not retrieved_chunks:
-        prompt = _build_general_prompt(query)
+        prompt = _build_general_prompt(query, question_type=question_type)
     else:
-        top_chunks = retrieved_chunks[:50] if any(c.get("is_workflow_expanded") for c in retrieved_chunks) else retrieved_chunks[:5]
+        top_chunks = retrieved_chunks[:50] if any(c.get("is_workflow_expanded") for c in retrieved_chunks) else retrieved_chunks[:8]
         context_blocks = []
         total_context_chars = 0
         max_context_chars = 25000
 
         for idx, item in enumerate(top_chunks, start=1):
+            doc_title = item.get("document_title") or "Document"
             sec_title = item.get('section_title')
             clean_lbl = _clean_section_title(sec_title)
             sec_lbl = f" [{clean_lbl}]" if clean_lbl else ""
@@ -568,18 +612,18 @@ def generate_answer(
             if total_context_chars + len(cleaned_text) > max_context_chars:
                 break
             context_blocks.append(
-                f"[{idx}]{sec_lbl} Content:\n{cleaned_text}"
+                f"[{idx}] (Document: {doc_title}){sec_lbl} Content:\n{cleaned_text}"
             )
             total_context_chars += len(cleaned_text)
 
         context_str = "\n\n".join(context_blocks)
-        prompt = _build_rag_prompt(query, context_str)
+        prompt = _build_rag_prompt(query, context_str, question_type=question_type)
 
     try:
         result = _call_gemini(prompt)
         if result:
             elapsed = time.time() - t0
-            logger.info(f"[LLM] Gemini answered in {elapsed:.2f}s (query: '{query[:50]}')")
+            logger.info(f"[LLM] Gemini answered in {elapsed:.2f}s (query: '{query[:50]}', type: {question_type})")
             clean_answer = sanitize_answer_text(result)
             speech_text = build_speech_text(clean_answer)
             return {
@@ -600,3 +644,4 @@ def generate_answer(
         "provider": "fallback",
         "degraded": True,
     }
+

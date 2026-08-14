@@ -1,3 +1,4 @@
+import re
 import time
 import logging
 import concurrent.futures
@@ -5,11 +6,83 @@ from typing import List, Dict, Tuple
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.services.retrieval_service import search_relevant_chunks
-from app.services.llm_provider import generate_answer
+from app.services.llm_provider import generate_answer, classify_question_llm
 
 logger = logging.getLogger(__name__)
 
 RAG_TOTAL_TIMEOUT_SECONDS = 90  # Max time for the entire RAG pipeline
+
+_DEF_PATTERNS = [
+    re.compile(r'^\s*(?:what\s+is|what\s+are|define|what\s+does\s+.*\s+mean)\b', re.IGNORECASE),
+    re.compile(r'\bmeaning\s+of\b', re.IGNORECASE),
+    re.compile(r'^\s*definition\s+of\b', re.IGNORECASE),
+]
+_EXP_PATTERNS = [
+    re.compile(r'^\s*(?:explain|how\s+does|why\s+does|how\s+do|why\s+is|why\s+are|how\s+can|how\s+works)\b', re.IGNORECASE),
+    re.compile(r'\bhow\s+it\s+works\b', re.IGNORECASE),
+]
+_LIST_PATTERNS = [
+    re.compile(r'^\s*(?:list|steps\s+to|what\s+are\s+the\s+(?:types|steps|methods|ways|kinds|categories|approaches)|how\s+to)\b', re.IGNORECASE),
+    re.compile(r'\b(?:types|steps|methods|categories|advantages|disadvantages)\s+of\b', re.IGNORECASE),
+]
+_COMP_PATTERNS = [
+    re.compile(r'^\s*(?:difference\s+between|compare|vs\.?|versus|comparison|how\s+does\s+.*\s+differ)\b', re.IGNORECASE),
+    re.compile(r'\b(?:difference|comparison|versus|\bvs\b)\b', re.IGNORECASE),
+]
+_FORMULA_PATTERNS = [
+    re.compile(r'^\s*(?:formula|equation|how\s+(?:do\s+you|to)\s+calculate|calculate|how\s+is\s+.*\s+calculated|math\s+for)\b', re.IGNORECASE),
+    re.compile(r'\b(?:formula|equation|calculation|math\s+formula|derivation)\b', re.IGNORECASE),
+]
+_SUMMARY_PATTERNS = [
+    re.compile(r'^\s*(?:summarize|summary\s+of|give\s+a\s+summary|overview\s+of)\b', re.IGNORECASE),
+    re.compile(r'\b(?:summary|overview|key\s+takeaways)\b', re.IGNORECASE),
+]
+
+
+def classify_question_type(query: str) -> str:
+    """
+    Classifies the user's question into one of six categories:
+    - DEFINITION ("what is X", "define X")
+    - EXPLANATION ("explain X", "how does X work", "why does X happen")
+    - LIST ("list the types of X", "steps to do X")
+    - COMPARISON ("difference between X and Y", "compare X and Y")
+    - FORMULA ("formula for X", "how do you calculate X")
+    - SUMMARY ("summarize this document/chapter")
+    """
+    q = (query or "").strip().lower()
+    if not q:
+        return "EXPLANATION"
+
+    # Fast heuristic check in priority order
+    if any(p.search(q) for p in _FORMULA_PATTERNS):
+        return "FORMULA"
+    if any(p.search(q) for p in _COMP_PATTERNS):
+        return "COMPARISON"
+    if any(p.search(q) for p in _SUMMARY_PATTERNS):
+        return "SUMMARY"
+    if any(p.search(q) for p in _LIST_PATTERNS):
+        return "LIST"
+    if any(p.search(q) for p in _DEF_PATTERNS):
+        if "formula" in q or "calculate" in q or "equation" in q:
+            return "FORMULA"
+        if "difference" in q or "compare" in q:
+            return "COMPARISON"
+        if "steps" in q or "types" in q or "methods" in q:
+            return "LIST"
+        return "DEFINITION"
+    if any(p.search(q) for p in _EXP_PATTERNS):
+        return "EXPLANATION"
+
+    # Quick LLM fallback if regex heuristic is ambiguous
+    try:
+        llm_type = classify_question_llm(query)
+        if llm_type in {"DEFINITION", "EXPLANATION", "LIST", "COMPARISON", "FORMULA", "SUMMARY"}:
+            logger.info(f"[QuestionClassifier] LLM classified '{query[:50]}' as {llm_type}")
+            return llm_type
+    except Exception as e:
+        logger.warning(f"[QuestionClassifier] LLM fallback classification warning: {e}")
+
+    return "EXPLANATION"
 
 
 def generate_rag_response(
@@ -63,6 +136,10 @@ def _generate_rag_response_core(
 ) -> Tuple[str, List[Dict[str, any]], Dict[str, any]]:
     t0 = time.time()
 
+    # ── STAGE 0: QUESTION TYPE CLASSIFICATION ──────────────────────
+    question_type = classify_question_type(user_query)
+    logger.info(f"[RAG Timing] Question Type for query '{user_query[:50]}': {question_type}")
+
     # ── STAGE 1: VECTOR RETRIEVAL ──────────────────────────────────
     try:
         retrieved_chunks = search_relevant_chunks(
@@ -98,7 +175,8 @@ def _generate_rag_response_core(
         query=user_query,
         retrieved_chunks=retrieved_chunks,
         zero_chunk_mode=zero_chunk_mode,
-    )  # query passed for fallback quick-answer heuristic extraction
+        question_type=question_type,
+    )
 
     t3 = time.time()
     logger.info(
@@ -110,6 +188,8 @@ def _generate_rag_response_core(
         "provider": llm_result["provider"],
         "degraded": llm_result["degraded"],
         "speech_text": llm_result.get("speech_text", llm_result["answer"]),
+        "question_type": question_type,
     }
 
     return llm_result["answer"], citations_data, metadata
+

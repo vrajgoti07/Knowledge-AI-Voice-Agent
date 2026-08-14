@@ -23,10 +23,12 @@ from app.core.qdrant_client import search_qdrant_chunks, fetch_parent_section_ch
 logger = logging.getLogger("knowledge_ai.retrieval")
 
 # ── Tunable thresholds ────────────────────────────────────────────────────────
-RERANK_MIN_SCORE: float = 0.40
+RERANK_MIN_SCORE: float = 0.35
 QDRANT_CANDIDATE_K: int = 20
-FINAL_TOP_K: int = 5
+FINAL_TOP_K: int = 8
+MAX_CHUNKS_PER_DOC: int = 3
 DEBUG_LOG_TOP_N: int = 10
+
 
 # ── Workflow/Process Intent Detection Patterns ───────────────────────────────
 _WORKFLOW_INTENT_PATTERNS = [
@@ -212,19 +214,51 @@ def expand_parent_section_chunks(
     return chunks
 
 
+def apply_diversity_cap(
+    chunks: List[Dict[str, Any]],
+    max_per_doc: int = MAX_CHUNKS_PER_DOC,
+    top_k: int = FINAL_TOP_K,
+) -> List[Dict[str, Any]]:
+    """
+    Applies per-document diversity cap: selects top candidate chunks such that
+    no single document contributes more than `max_per_doc` chunks (default 3) to top_k (default 8).
+    """
+    if not chunks:
+        return []
+
+    doc_counts: Dict[str, int] = {}
+    selected: List[Dict[str, Any]] = []
+
+    for chunk in chunks:
+        doc_id = chunk.get("document_id") or "unknown"
+        current_count = doc_counts.get(doc_id, 0)
+        if current_count < max_per_doc:
+            selected.append(chunk)
+            doc_counts[doc_id] = current_count + 1
+            if len(selected) >= top_k:
+                break
+
+    logger.info(
+        f"[DiversityCap] Selected {len(selected)} chunks across {len(doc_counts)} documents "
+        f"(max {max_per_doc} per doc, target top_k={top_k})"
+    )
+    return selected
+
+
 def rerank_chunks(
     query: str,
     candidates: List[Dict[str, Any]],
     top_k: int = FINAL_TOP_K,
     min_score: float = RERANK_MIN_SCORE,
+    max_per_doc: int = MAX_CHUNKS_PER_DOC,
 ) -> List[Dict[str, Any]]:
     if not candidates:
         return []
 
     cross_enc = get_cross_encoder()
     if cross_enc is None:
-        filtered = [c for c in candidates if c.get("score", 0) >= 0.30]
-        return filtered[:top_k]
+        filtered = [c for c in candidates if c.get("score", 0) >= min_score]
+        return apply_diversity_cap(filtered, max_per_doc=max_per_doc, top_k=top_k)
 
     try:
         import math
@@ -269,12 +303,13 @@ def rerank_chunks(
             )
             return []
 
-        return filtered[:top_k]
+        return apply_diversity_cap(filtered, max_per_doc=max_per_doc, top_k=top_k)
 
     except Exception as e:
         logger.error(f"[Rerank] Prediction failed: {e}. Falling back to cosine.")
-        filtered = [c for c in candidates if c.get("score", 0) >= 0.30]
-        return filtered[:top_k] if filtered else []
+        filtered = [c for c in candidates if c.get("score", 0) >= min_score]
+        return apply_diversity_cap(filtered, max_per_doc=max_per_doc, top_k=top_k)
+
 
 
 def is_boilerplate_text(content: str, page_number: int) -> bool:
