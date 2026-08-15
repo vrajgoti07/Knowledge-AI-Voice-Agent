@@ -78,6 +78,9 @@
   --animate-fade-in: fadeIn 0.3s ease forwards;
   --animate-fade-up: fadeUp 0.4s ease forwards;
   --animate-pulse-slow: pulseSlow 3s infinite ease-in-out;
+  --animate-pan-grid: panGridDiag 25s linear infinite;
+  --animate-aura-pulse: auraPulse 4s infinite ease-in-out;
+  --animate-scanline: scanlineFlash 0.8s ease-out;
 
   @keyframes fadeIn {
     from { opacity: 0; }
@@ -90,6 +93,39 @@
   @keyframes pulseSlow {
     0%, 100% { transform: scale(1); opacity: 0.8; }
     50%      { transform: scale(1.05); opacity: 1; }
+  }
+  @keyframes panGridDiag {
+    0% {
+      background-position: 0 0, 0 0, 0 0;
+    }
+    100% {
+      background-position: 64px 64px, 64px 64px, 64px 64px;
+    }
+  }
+  @keyframes auraPulse {
+    0%, 100% {
+      opacity: 0.35;
+      transform: scale(0.98);
+      filter: blur(24px);
+    }
+    50% {
+      opacity: 0.65;
+      transform: scale(1.04);
+      filter: blur(36px);
+    }
+  }
+  @keyframes scanlineFlash {
+    0% {
+      transform: translateX(-120%) skewX(-20deg);
+      opacity: 0;
+    }
+    40% {
+      opacity: 0.85;
+    }
+    100% {
+      transform: translateX(250%) skewX(-20deg);
+      opacity: 0;
+    }
   }
 }
 
@@ -344,4 +380,131 @@ select:-webkit-autofill:focus {
 .ai-prose a:hover {
   text-decoration-color: #60A5FA;
 }
+
+/* ============================================================
+   CYBER-PHYSICAL AUTH GATEWAY UTILITIES
+   Strict Palette: slate-950, cyan (#22d3ee), blue (#3b82f6), slate-300, white
+   ============================================================ */
+
+/* Seamless Diagonal Panning Knowledge Grid Background */
+.bg-cyber-grid {
+  background-image: 
+    radial-gradient(circle at 1px 1px, rgba(34, 211, 238, 0.14) 1.2px, transparent 0),
+    linear-gradient(to right, rgba(59, 130, 246, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(59, 130, 246, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px, 32px 32px;
+  animation: panGridDiag 30s linear infinite;
+}
+
+/* Input Focus Animated Bottom Line Sweep */
+.cyber-input-wrapper {
+  position: relative;
+}
+
+.cyber-input-sweep {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #22d3ee 0%, #3b82f6 100%);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 0 0 12px 12px;
+  pointer-events: none;
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.6);
+}
+
+.cyber-input-wrapper:focus-within .cyber-input-sweep {
+  transform: scaleX(1);
+}
+
+/* Scanline flash effect on Cyber Button */
+.cyber-button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cyber-button::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 100%
+  );
+  transform: translateX(-150%) skewX(-20deg);
+  pointer-events: none;
+}
+
+.cyber-button:hover::after,
+.cyber-button:active::after {
+  animation: scanlineFlash 0.75s ease-out;
+}
+
+/* Continuous Shimmering Gradient for Command Center Buttons */
+.btn-shimmer {
+  background-size: 250% 250%;
+  animation: gradientShimmer 4s ease infinite;
+}
+
+@keyframes gradientShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* CRT Beam Horizontal Glow */
+.crt-line-flare {
+  box-shadow: 0 0 20px #22d3ee, 0 0 40px #3b82f6;
+}
+
+/* ============================================================
+   SEMANTIC PULSE FIELD (RAG Vector Similarity Sonar Waves)
+   Pure CSS concentric expanding ripples
+   ============================================================ */
+
+@keyframes semanticPulseRing {
+  0% {
+    transform: translate(-50%, -50%) scale(0.35);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.55;
+  }
+  65% {
+    opacity: 0.2;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.4);
+    opacity: 0;
+  }
+}
+
+.semantic-pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  pointer-events: none;
+  border: 1px solid rgba(34, 211, 238, 0.12);
+  box-shadow: 0 0 50px rgba(34, 211, 238, 0.04), inset 0 0 50px rgba(59, 130, 246, 0.03);
+  animation: semanticPulseRing 14s cubic-bezier(0.1, 0.4, 0.3, 1) infinite;
+}
+
+
+
 
