@@ -282,7 +282,8 @@ def post_message(
                 excerpt=c.get("excerpt", ""),
                 page=c.get("page"),
                 chunk=c.get("chunk"),
-                score=c.get("score")
+                score=c.get("score"),
+                url=f"/api/v1/documents/{c.get('document_id', '')}/file" if c.get("document_id") else None
             )
             db.add(cit_obj)
             db.flush()

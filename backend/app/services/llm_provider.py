@@ -531,51 +531,56 @@ def is_shallow_or_meta_answer(answer: str, query: str) -> bool:
 _TYPE_INSTRUCTIONS: Dict[str, str] = {
     "DEFINITION": (
         "QUESTION TYPE: DEFINITION ('what is X', 'define X')\n"
-        "INSTRUCTION: Provide a complete, clear, and substantive definition in 3-5 sentences (roughly 80-140 words). "
-        "The answer must actually STATE the definition using the retrieved source content, not merely reference that a definition exists. "
-        "Never write phrases like 'is defined as' or 'is explained in the source' without immediately including the actual definition content that follows. "
-        "Do not produce meta-referential answers (e.g. 'X is discussed in [source]' or 'X is defined formally and intuitively [source]') without including the actual content of that discussion or definition in the same response. "
-        "If the retrieved context does not contain enough substantive content to form a real definition, say so explicitly rather than producing a vague or circular answer. "
-        "Do NOT use markdown headers (##)."
+        "INSTRUCTION: Provide a comprehensive, in-depth definition and conceptual explanation based on the retrieved documents. "
+        "Explain what the concept is, why it is important, its core principles, and how it is applied in practice. "
+        "Include concrete real-world examples and intuitive analogies to make the concept crystal clear to the reader. "
+        "The answer must state the actual definition and explanation thoroughly using the source text, never giving superficial or one-line answers."
     ),
     "EXPLANATION": (
-        "QUESTION TYPE: EXPLANATION ('explain X', 'how does X work', 'why does X happen')\n"
-        "INSTRUCTION: Provide a structured multi-paragraph answer with a brief introduction, followed by organized sub-points. "
-        "Use markdown headers (##) ONLY if there are multiple distinct sub-topics. Strict maximum length: 250 words unless the topic genuinely requires more."
+        "QUESTION TYPE: EXPLANATION ('explain X', 'how does X work', 'why does X happen', in-depth questions)\n"
+        "INSTRUCTION: Provide a thorough, structured, and deep-dive explanation. "
+        "Break down the topic into logical sections using bold headings (###). "
+        "For each section, provide clear explanations, operational mechanics (how it works step-by-step), underlying principles, and concrete practical examples. "
+        "If mathematical concepts or algorithms are involved, clearly explain them with proper LaTeX notation. "
+        "Ensure the explanation is rich, rigorous, and easy for students and practitioners to understand."
     ),
     "LIST": (
-        "QUESTION TYPE: LIST/STEPS ('list the types of X', 'steps to do X')\n"
-        "INSTRUCTION: Provide a clean numbered or bulleted list with minimal introductory or concluding prose around it. "
-        "Strict maximum length: 150 words unless the list itself is inherently long."
+        "QUESTION TYPE: CATEGORIES, TYPES & LISTS ('types of X', 'steps to do X', 'categories with examples')\n"
+        "INSTRUCTION: Provide a comprehensive, detailed breakdown of all types/categories/methods. "
+        "For EACH item in the list:\n"
+        "  1. Bold Title & Core Definition: Clearly define what it is.\n"
+        "  2. How It Works / Key Characteristics: Explain the core mechanics or methodology.\n"
+        "  3. Practical Real-World Examples: Provide concrete, relatable examples illustrating where and how it is used.\n"
+        "  4. Common Algorithms or Techniques (if applicable in context).\n"
+        "Do NOT write brief one-line summaries. Provide a rich, informative explanation for every category so the reader gains a deep understanding."
     ),
     "COMPARISON": (
         "QUESTION TYPE: COMPARISON ('difference between X and Y', 'compare X and Y')\n"
-        "INSTRUCTION: Provide a side-by-side bullet comparison or a clean GFM markdown table comparing the concepts."
+        "INSTRUCTION: Provide a structured comparison starting with a high-level summary of the key distinction, "
+        "followed by a clean GFM markdown table comparing key dimensions (Objective, Data Type, Algorithms, Pros/Cons, Real-World Use Cases), "
+        "and detailed explanatory paragraphs with concrete examples for each."
     ),
     "FORMULA": (
-        "QUESTION TYPE: FORMULA/CALCULATION ('formula for X', 'how do you calculate X')\n"
-        "INSTRUCTION: Present the mathematical formula or equation FIRST using proper LaTeX ($formula$ or $$formula$$), "
-        "followed by a short, plain-language explanation of each term/variable."
+        "QUESTION TYPE: FORMULA & MATHEMATICS ('formula for X', 'how to calculate X')\n"
+        "INSTRUCTION: Present the exact mathematical formulation FIRST using standard LaTeX ($...$ inline or $$...$$ display block). "
+        "Then define every single variable, parameter, and symbol in a clear breakdown list. "
+        "Follow with an intuitive step-by-step explanation of what the equation represents and provide a concrete numerical or conceptual walkthrough example."
     ),
     "SUMMARY": (
-        "QUESTION TYPE: SUMMARY ('summarize this document/chapter')\n"
-        "INSTRUCTION: Provide a structured summary with clear markdown headers (##) for major sections."
+        "QUESTION TYPE: SUMMARY ('summarize this document/chapter/topic')\n"
+        "INSTRUCTION: Provide an executive, structured summary covering the core themes, major methodologies, key takeaways, and practical implications with clear markdown headings (###)."
     ),
 }
 
 _STANDARD_FORMATTING_RULES = (
-    "STANDARD FORMATTING RULES (apply strictly to all answers):\n"
-    "- Bold key terms ONLY the first time they are introduced — do NOT bold every occurrence.\n"
-    "- Use bullet points (-) or numbered lists (1. 2. 3.) for any enumerable information (types, steps, causes, examples) — NEVER write a wall of prose when content is naturally list-shaped.\n"
-    "- Use markdown headers (##) ONLY for SUMMARY-type or long EXPLANATION answers with multiple distinct sub-topics — NEVER for short DEFINITION answers.\n"
-    "- CITATION PLACEMENT: Place citation markers [1], [2] IMMEDIATELY after the specific claim or fact they support (e.g., 'Backpropagation calculates gradients using the chain rule [1].'), NOT all bunched at the end of paragraphs or answers.\n"
-    "- SOURCES LINE: End every answer with a single 'Sources:' line listing ONLY the document titles actually cited in your response (e.g., 'Sources: [1] Machine Learning Overview, [2] Neural Networks Guide'), not every document in the knowledge base.\n"
-    "- MATHEMATICS & FORMULAS:\n"
-    "  • Source text extracted from PDFs may contain garbled or malformed mathematical notation due to PDF extraction limitations. When you recognize a standard formula (e.g. gradient descent, Bayes' theorem, cross-entropy loss) from context even if extracted text is imperfect, reconstruct it correctly using proper LaTeX notation rather than reproducing the garbled text.\n"
-    "  • Always wrap math in standard LaTeX delimiters: inline math as $formula$ (e.g. $E = mc^2$), block equations as $$formula$$\n"
-    "  • Use proper LaTeX notation: superscripts (^), subscripts (_), \\frac{}{}, \\sum, \\int, \\nabla, \\theta, \\mathbb{R}, etc.\n"
-    "  • NEVER write math as plain text like 'AT' for transpose — always use $A^T$\n"
-    "- CODE: Always wrap code in fenced code blocks with language tags (```python, ```javascript, etc.)"
+    "STANDARD FORMATTING & QUALITY RULES:\n"
+    "- DEPTH & RIGOR: Provide thorough, well-structured, industry-grade responses. Avoid shallow 3-line summaries.\n"
+    "- STRUCTURE: Use clear hierarchy with Markdown headings (###), bold key terms, and bullet points for readability.\n"
+    "- EXAMPLES: Always include concrete, illustrative real-world examples when explaining concepts, types, and workflows.\n"
+    "- CITATION PLACEMENT: Place citation markers [1], [2], etc. immediately after the specific claim, definition, or fact they support.\n"
+    "- SOURCES LINE: End your response with a dedicated 'Sources:' line listing ONLY the document titles actually cited in your response (e.g., 'Sources: [1] Module 1 - Introduction to Machine Learning.pdf, [2] Machine Learning Guide.pdf').\n"
+    "- MATHEMATICS & FORMULAS: Always use proper LaTeX notation ($formula$ or $$formula$$) for equations, matrices, vectors ($x \\in \\mathbb{R}^d$), and Greek letters.\n"
+    "- CODE: Always wrap code in fenced code blocks with language tags (```python, ```cpp, etc.)."
 )
 
 
@@ -722,7 +727,7 @@ def _build_general_prompt(
     )
 
 
-def _call_groq(prompt: str, max_tokens: int = 1500, temperature: float = 0.2) -> Optional[str]:
+def _call_groq(prompt: str, max_tokens: int = 3000, temperature: float = 0.2) -> Optional[str]:
     """Calls Groq API using Groq SDK or httpx fallback."""
     if _provider_state["groq"]["status"] == "not_configured":
         validate_providers_at_startup()
@@ -868,7 +873,7 @@ def _call_gemini(prompt: str) -> Optional[str]:
     return None
 
 
-def _call_llm(prompt: str, max_tokens: int = 1500, temperature: float = 0.2) -> Tuple[Optional[str], str]:
+def _call_llm(prompt: str, max_tokens: int = 3000, temperature: float = 0.2) -> Tuple[Optional[str], str]:
     """
     Unified LLM router:
     Checks configured provider order (Groq primary, Gemini paused/fallback).
@@ -957,7 +962,7 @@ def generate_answer(
         )
 
     try:
-        result, active_provider = _call_llm(prompt, max_tokens=1500, temperature=0.2)
+        result, active_provider = _call_llm(prompt, max_tokens=3000, temperature=0.2)
         if result:
             # Quality check: check if answer is shallow/meta-referential
             if is_shallow_or_meta_answer(result, query):

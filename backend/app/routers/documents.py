@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.models.document import Document
 from app.schemas.document import DocumentResponse, DocumentUpdate
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, get_current_user_optional
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -174,9 +174,65 @@ def get_document(
     doc = db.query(Document).filter(Document.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    if doc.uploaded_by != current_user.id and not doc.is_knowledge_base:
+    if doc.uploaded_by != current_user.id and not doc.is_knowledge_base and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Access denied")
     return DocumentResponse.model_validate(doc)
+
+
+@router.get("/{document_id}/file")
+def get_document_file(
+    document_id: str,
+    token: Optional[str] = Query(None),
+    header_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    from fastapi.responses import FileResponse
+    from app.core.security import decode_token
+
+    user = header_user
+    if not user and token:
+        try:
+            payload = decode_token(token)
+            if payload and payload.get("type") == "access":
+                user_id = payload.get("sub")
+                if user_id:
+                    user = db.query(User).filter(User.id == user_id).first()
+        except Exception:
+            pass
+
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # If document is in shared knowledge base, allow viewing without restriction
+    if doc.is_knowledge_base:
+        pass
+    else:
+        if not user:
+            raise HTTPException(status_code=401, detail="Authentication required to view this private document")
+        if doc.uploaded_by != user.id and getattr(user, "role", "") != "admin":
+            raise HTTPException(status_code=403, detail="Access denied to this document file")
+
+    if not doc.file_path or not os.path.exists(doc.file_path):
+        raise HTTPException(status_code=404, detail="Physical document file not found on disk")
+
+    ext = (doc.file_type or "pdf").lower()
+    media_types = {
+        "pdf": "application/pdf",
+        "txt": "text/plain",
+        "md": "text/markdown",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    }
+    media_type = media_types.get(ext, "application/octet-stream")
+    filename = doc.title if doc.title else f"document.{ext}"
+
+    return FileResponse(
+        path=doc.file_path,
+        media_type=media_type,
+        filename=filename,
+        content_disposition_type="inline"
+    )
 
 
 @router.patch("/{document_id}", response_model=DocumentResponse)

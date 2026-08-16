@@ -33,6 +33,23 @@ def get_current_user(
 
     return user
 
+def get_current_user_optional(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+) -> User | None:
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+        if not payload or payload.get("type") != "access":
+            return None
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        return db.query(User).filter(User.id == user_id).first()
+    except Exception:
+        return None
+
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role != "admin":
         raise HTTPException(

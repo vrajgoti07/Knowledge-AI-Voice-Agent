@@ -1,9 +1,3 @@
-// ============================================================
-// ChatMessageBubble — Rich Document Canvas Layout
-// Renders markdown prose with GFM tables, KaTeX math, and clean formatting
-// User Prompt: Prominent heading text-xl font-semibold text-white
-// AI Response: Typeset document with math, tables, code blocks, and TTS
-// ============================================================
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
@@ -12,12 +6,14 @@ import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { Sparkles, Copy, Check, Volume2, VolumeX } from 'lucide-react'
+import { DocumentSourcesList, InlineCitationChip, type Citation } from './CitationBadges'
+import { PdfViewerPanel } from '../documents/PdfViewerPanel'
 
 export interface Message {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
-  citations?: any[]
+  citations?: Citation[]
   timestamp?: string
   model?: string
   error?: string
@@ -39,125 +35,162 @@ function sanitizeText(content: string): string {
     .trim()
 }
 
-
-// Markdown components for rich typeset prose, GFM tables, and math
-const mdComponents: Record<string, React.FC<any>> = {
-  p: ({ children }) => (
-    <p className="text-[15px] text-slate-300 leading-[1.85] mb-4 last:mb-0 font-normal">{children}</p>
-  ),
-  strong: ({ children }) => (
-    <strong className="text-white font-semibold">{children}</strong>
-  ),
-  em: ({ children }) => (
-    <em className="text-slate-400 italic">{children}</em>
-  ),
-  h1: ({ children }) => (
-    <h1 className="text-xl font-bold text-white mt-8 mb-4 first:mt-0 tracking-tight border-b border-white/[0.06] pb-2">{children}</h1>
-  ),
-  h2: ({ children }) => (
-    <h2 className="text-lg font-bold text-white mt-7 mb-3 first:mt-0 tracking-tight">{children}</h2>
-  ),
-  h3: ({ children }) => (
-    <h3 className="text-base font-semibold text-sky-300 tracking-wide mt-5 mb-2 first:mt-0">{children}</h3>
-  ),
-  h4: ({ children }) => (
-    <h4 className="text-sm font-semibold text-sky-200 mt-4 mb-2 first:mt-0">{children}</h4>
-  ),
-  ul: ({ children }) => (
-    <ul className="space-y-1.5 my-4 ml-1">{children}</ul>
-  ),
-  ol: ({ children, start }) => (
-    <ol className="space-y-1.5 my-4 ml-1 list-none counter-reset-list" start={start}>{children}</ol>
-  ),
-  li: ({ children, node, ordered, index: liIndex }) => {
-    // Detect if parent is an ordered list by checking the node's parent or the ordered prop
-    const isOrdered = ordered === true || (node?.position && false) // react-markdown passes 'ordered' prop
-    if (isOrdered) {
-      return (
-        <li className="flex gap-2.5 text-[15px] text-slate-300 leading-[1.85]">
-          <span className="text-sky-400 shrink-0 font-semibold min-w-[1.5em] text-right">{typeof liIndex === 'number' ? `${liIndex + 1}.` : '•'}</span>
-          <span className="flex-1">{children}</span>
-        </li>
-      )
-    }
-    return (
-      <li className="flex gap-2.5 text-[15px] text-slate-300 leading-[1.85]">
-        <span className="text-sky-400 mt-[2px] shrink-0">•</span>
-        <span className="flex-1">{children}</span>
-      </li>
-    )
-  },
-  code: ({ inline, className, children }: any) => {
-    // Detect language from className (e.g., "language-python")
-    const match = /language-(\w+)/.exec(className || '')
-    const lang = match ? match[1] : ''
-
-    if (inline) {
-      return (
-        <code className="px-1.5 py-0.5 rounded bg-white/[0.07] text-sky-300 text-[13px] font-mono border border-white/10">
-          {children}
-        </code>
-      )
-    }
-    return (
-      <pre className="my-5 rounded-xl bg-[#0d1117] border border-white/10 overflow-x-auto shadow-lg">
-        {lang && (
-          <div className="px-4 py-2 text-[11px] font-mono text-slate-500 border-b border-white/[0.06] bg-white/[0.02]">
-            {lang}
-          </div>
-        )}
-        <code className={`block px-4 py-3 text-[13px] font-mono text-slate-300 leading-relaxed ${className || ''}`}>
-          {children}
-        </code>
-      </pre>
-    )
-  },
-  blockquote: ({ children }) => (
-    <blockquote className="my-4 pl-4 border-l-2 border-sky-400/40 text-slate-400 text-[15px] leading-[1.85] bg-sky-500/[0.03] py-2 rounded-r-lg">
-      {children}
-    </blockquote>
-  ),
-  hr: () => (
-    <hr className="my-6 border-0 border-t border-white/[0.08]" />
-  ),
-  table: ({ children }) => (
-    <div className="my-6 w-full overflow-x-auto rounded-xl border border-white/10 bg-slate-900/80 shadow-xl">
-      <table className="w-full text-left text-sm text-slate-200 border-collapse">{children}</table>
-    </div>
-  ),
-  thead: ({ children }) => (
-    <thead className="bg-sky-950/60 text-xs font-semibold uppercase tracking-wider text-sky-300 border-b border-white/10">
-      {children}
-    </thead>
-  ),
-  tbody: ({ children }) => (
-    <tbody className="divide-y divide-white/[0.06]">{children}</tbody>
-  ),
-  tr: ({ children }) => (
-    <tr className="hover:bg-white/[0.04] transition-colors">{children}</tr>
-  ),
-  th: ({ children }) => (
-    <th className="px-4 py-3 font-semibold text-sky-300 border-b border-white/10 whitespace-nowrap">{children}</th>
-  ),
-  td: ({ children }) => (
-    <td className="px-4 py-3 text-slate-300 leading-relaxed align-top">{children}</td>
-  ),
-  sup: ({ children }) => (
-    <sup className="text-sky-300">{children}</sup>
-  ),
-  sub: ({ children }) => (
-    <sub className="text-sky-300">{children}</sub>
-  ),
-}
-
 export function ChatMessageBubble({ message, index }: Props) {
   const isUser = message.role === 'user'
   const [copied, setCopied] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [activeViewerCitation, setActiveViewerCitation] = useState<Citation | null>(null)
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   const cleanContent = sanitizeText(message.content)
   const textToSpeak = message.speechText ? message.speechText : cleanContent
+
+  // Build citation map for quick lookup by index
+  const citationMap = React.useMemo(() => {
+    const map = new Map<number, Citation>()
+    if (message.citations) {
+      message.citations.forEach((c, idx) => {
+        map.set(idx + 1, c)
+      })
+    }
+    return map
+  }, [message.citations])
+
+  const handleOpenPdf = (cit: Citation) => {
+    setActiveViewerCitation(cit)
+  }
+
+  // Custom text renderer to parse [1], [2] into InlineCitationChip
+  const mdComponents: Record<string, React.FC<any>> = {
+    p: ({ children }) => {
+      // Check if children contain text with [1], [2] citation markers
+      const renderWithCitations = (node: any): any => {
+        if (typeof node === 'string') {
+          const parts = node.split(/(\[\d+\])/g)
+          if (parts.length > 1) {
+            return parts.map((part, i) => {
+              const match = part.match(/^\[(\d+)\]$/)
+              if (match) {
+                const num = parseInt(match[1], 10)
+                const cit = citationMap.get(num)
+                return (
+                  <InlineCitationChip
+                    key={i}
+                    num={num}
+                    citation={cit}
+                    onOpenPdf={handleOpenPdf}
+                  />
+                )
+              }
+              return part
+            })
+          }
+        }
+        return node
+      }
+
+      return (
+        <p className="text-[15px] text-slate-300 leading-[1.85] mb-4 last:mb-0 font-normal">
+          {React.Children.map(children, renderWithCitations)}
+        </p>
+      )
+    },
+    strong: ({ children }) => (
+      <strong className="text-white font-semibold">{children}</strong>
+    ),
+    em: ({ children }) => (
+      <em className="text-slate-400 italic">{children}</em>
+    ),
+    h1: ({ children }) => (
+      <h1 className="text-xl font-bold text-white mt-8 mb-4 first:mt-0 tracking-tight border-b border-white/[0.06] pb-2">{children}</h1>
+    ),
+    h2: ({ children }) => (
+      <h2 className="text-lg font-bold text-white mt-7 mb-3 first:mt-0 tracking-tight">{children}</h2>
+    ),
+    h3: ({ children }) => (
+      <h3 className="text-base font-semibold text-sky-300 tracking-wide mt-5 mb-2 first:mt-0">{children}</h3>
+    ),
+    h4: ({ children }) => (
+      <h4 className="text-sm font-semibold text-sky-200 mt-4 mb-2 first:mt-0">{children}</h4>
+    ),
+    ul: ({ children }) => (
+      <ul className="space-y-2 my-4 ml-1">{children}</ul>
+    ),
+    ol: ({ children, start }) => (
+      <ol className="space-y-2 my-4 ml-1 list-none counter-reset-list" start={start}>{children}</ol>
+    ),
+    li: ({ children, node, ordered, index: liIndex }) => {
+      const isOrdered = ordered === true
+      if (isOrdered) {
+        return (
+          <li className="flex gap-2.5 text-[15px] text-slate-300 leading-[1.85]">
+            <span className="text-sky-400 shrink-0 font-semibold min-w-[1.5em] text-right">{typeof liIndex === 'number' ? `${liIndex + 1}.` : '•'}</span>
+            <span className="flex-1">{children}</span>
+          </li>
+        )
+      }
+      return (
+        <li className="flex gap-2.5 text-[15px] text-slate-300 leading-[1.85]">
+          <span className="text-sky-400 mt-[2px] shrink-0 font-bold">•</span>
+          <span className="flex-1">{children}</span>
+        </li>
+      )
+    },
+    code: ({ inline, className, children }: any) => {
+      const match = /language-(\w+)/.exec(className || '')
+      const lang = match ? match[1] : ''
+
+      if (inline) {
+        return (
+          <code className="px-1.5 py-0.5 rounded bg-white/[0.07] text-sky-300 text-[13px] font-mono border border-white/10">
+            {children}
+          </code>
+        )
+      }
+      return (
+        <pre className="my-5 rounded-xl bg-[#0d1117] border border-white/10 overflow-x-auto shadow-lg">
+          {lang && (
+            <div className="px-4 py-2 text-[11px] font-mono text-slate-500 border-b border-white/[0.06] bg-white/[0.02]">
+              {lang}
+            </div>
+          )}
+          <code className={`block px-4 py-3 text-[13px] font-mono text-slate-300 leading-relaxed ${className || ''}`}>
+            {children}
+          </code>
+        </pre>
+      )
+    },
+    blockquote: ({ children }) => (
+      <blockquote className="my-4 pl-4 border-l-2 border-sky-400/40 text-slate-400 text-[15px] leading-[1.85] bg-sky-500/[0.03] py-2 rounded-r-lg">
+        {children}
+      </blockquote>
+    ),
+    hr: () => (
+      <hr className="my-6 border-0 border-t border-white/[0.08]" />
+    ),
+    table: ({ children }) => (
+      <div className="my-6 w-full overflow-x-auto rounded-xl border border-white/10 bg-slate-900/80 shadow-xl">
+        <table className="w-full text-left text-sm text-slate-200 border-collapse">{children}</table>
+      </div>
+    ),
+    thead: ({ children }) => (
+      <thead className="bg-sky-950/60 text-xs font-semibold uppercase tracking-wider text-sky-300 border-b border-white/10">
+        {children}
+      </thead>
+    ),
+    tbody: ({ children }) => (
+      <tbody className="divide-y divide-white/[0.06]">{children}</tbody>
+    ),
+    tr: ({ children }) => (
+      <tr className="hover:bg-white/[0.04] transition-colors">{children}</tr>
+    ),
+    th: ({ children }) => (
+      <th className="px-4 py-3 font-semibold text-sky-300 border-b border-white/10 whitespace-nowrap">{children}</th>
+    ),
+    td: ({ children }) => (
+      <td className="px-4 py-3 text-slate-300 leading-relaxed align-top">{children}</td>
+    ),
+  }
 
   // Stop speech when component unmounts
   useEffect(() => {
@@ -305,8 +338,30 @@ export function ChatMessageBubble({ message, index }: Props) {
               </ReactMarkdown>
             )}
           </div>
+
+          {/* Document Sources & Citations Component */}
+          {message.citations && message.citations.length > 0 && (
+            <DocumentSourcesList
+              citations={message.citations}
+              onOpenPdf={handleOpenPdf}
+            />
+          )}
+
+          {/* In-app PDF Viewer Slide-over Panel / Modal */}
+          {activeViewerCitation && (
+            <PdfViewerPanel
+              isOpen={Boolean(activeViewerCitation)}
+              onClose={() => setActiveViewerCitation(null)}
+              documentId={activeViewerCitation.documentId || ''}
+              documentTitle={activeViewerCitation.documentTitle || 'Document'}
+              initialPage={activeViewerCitation.page || 1}
+              highlightText={activeViewerCitation.excerpt || ''}
+              score={activeViewerCitation.score}
+            />
+          )}
         </div>
       )}
     </motion.div>
   )
 }
+
