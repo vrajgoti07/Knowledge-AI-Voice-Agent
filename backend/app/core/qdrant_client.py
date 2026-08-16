@@ -105,11 +105,15 @@ def upsert_document_chunks(
             "is_frontmatter": bool(c.get("is_frontmatter", False)),
             "document_title": str(doc_title),
             "page_number": c.get("page_number", 1),
+            "page_start": c.get("page_start", c.get("page_number", 1)),
+            "page_end": c.get("page_end", c.get("page_number", 1)),
             "text": c["content"],
             "tokens": c.get("tokens", 0),
             "section_number": c.get("section_number"),
             "section_title": c.get("section_title"),
-            "parent_section": c.get("parent_section")
+            "parent_section": c.get("parent_section"),
+            "parent_id": c.get("parent_id"),
+            "parent_content": c.get("parent_content"),
         }
         points.append(qmodels.PointStruct(
             id=point_id,
@@ -219,11 +223,15 @@ def search_qdrant_chunks(
                 "document_title": p.get("document_title", ""),
                 "content": p.get("text", ""),
                 "page": p.get("page_number", 1),
+                "page_start": p.get("page_start", p.get("page_number", 1)),
+                "page_end": p.get("page_end", p.get("page_number", 1)),
                 "chunk_index": p.get("chunk_index", 0),
                 "is_frontmatter": p.get("is_frontmatter", False),
                 "section_number": p.get("section_number"),
                 "section_title": p.get("section_title"),
                 "parent_section": p.get("parent_section"),
+                "parent_id": p.get("parent_id"),
+                "parent_content": p.get("parent_content"),
                 "score": round(float(getattr(hit, "score", 0.0)), 4)
             })
 

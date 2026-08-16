@@ -329,6 +329,170 @@ def is_boilerplate_text(content: str, page_number: int) -> bool:
     return False
 
 
+def _bm25_search(
+    db: Session,
+    user_id: str,
+    query: str,
+    top_k: int = QDRANT_CANDIDATE_K,
+    context_document_ids: Optional[List[str]] = None
+) -> List[Dict[str, Any]]:
+    """BM25Okapi keyword search over document chunks in DB."""
+    try:
+        from rank_bm25 import BM25Okapi
+    except ImportError:
+        logger.warning("[BM25] rank_bm25 not installed, skipping BM25 keyword search.")
+        return []
+
+    try:
+        query_builder = db.query(Document).filter(
+            (Document.uploaded_by == user_id) | (Document.is_knowledge_base == True)
+        )
+        if context_document_ids:
+            query_builder = query_builder.filter(Document.id.in_(context_document_ids))
+
+        user_docs = query_builder.all()
+        if not user_docs:
+            return []
+
+        doc_ids = [d.id for d in user_docs]
+        doc_map = {d.id: d for d in user_docs}
+
+        chunks = db.query(DocumentChunk).filter(DocumentChunk.document_id.in_(doc_ids)).all()
+        if not chunks:
+            return []
+
+        def tokenize(text: str) -> List[str]:
+            words = re.findall(r'\b[a-zA-Z0-9_\-\.]+\b', text.lower())
+            tokens = []
+            for w in words:
+                if w in _STOPWORDS:
+                    continue
+                tokens.append(w)
+                if w in _ACRONYM_MAP:
+                    tokens.extend(_ACRONYM_MAP[w].split())
+            return tokens
+
+        tokenized_corpus = [tokenize(c.content) for c in chunks]
+        tokenized_query = tokenize(query)
+        if not tokenized_query:
+            tokenized_query = [w.lower() for w in query.split()]
+
+        bm25 = BM25Okapi(tokenized_corpus)
+        scores = bm25.get_scores(tokenized_query)
+
+        scored_candidates = []
+        for idx, score in enumerate(scores):
+            if score > 0.05:
+                c = chunks[idx]
+                d = doc_map.get(c.document_id)
+                if not d:
+                    continue
+                if is_boilerplate_text(c.content, c.page_number or 1):
+                    continue
+                scored_candidates.append({
+                    "document_id": d.id,
+                    "document_title": d.title,
+                    "content": c.content,
+                    "page": c.page_number or 1,
+                    "page_start": getattr(c, "page_start", c.page_number or 1),
+                    "page_end": getattr(c, "page_end", c.page_number or 1),
+                    "chunk_index": c.chunk_index,
+                    "section_number": c.section_number,
+                    "section_title": c.section_title,
+                    "parent_section": c.parent_section,
+                    "parent_id": getattr(c, "parent_id", None),
+                    "parent_content": getattr(c, "parent_content", None),
+                    "bm25_score": round(float(score), 4),
+                    "score": round(float(score), 4)
+                })
+
+        scored_candidates.sort(key=lambda x: x["bm25_score"], reverse=True)
+        return scored_candidates[:top_k]
+    except Exception as bm_err:
+        logger.warning(f"[BM25] Keyword search warning: {bm_err}")
+        return []
+
+
+def reciprocal_rank_fusion(
+    dense_results: List[Dict[str, Any]],
+    bm25_results: List[Dict[str, Any]],
+    k: int = 60,
+    top_k: int = 20
+) -> List[Dict[str, Any]]:
+    """
+    Combines dense vector search results and BM25 keyword search results
+    using Reciprocal Rank Fusion (RRF):
+    RRF_score(d) = 1/(k + rank_dense(d)) + 1/(k + rank_bm25(d))
+    """
+    scores: Dict[str, float] = {}
+    items: Dict[str, Dict[str, Any]] = {}
+
+    for rank, item in enumerate(dense_results, 1):
+        key = f"{item.get('document_id')}_{item.get('chunk_index')}"
+        items[key] = item
+        scores[key] = scores.get(key, 0.0) + 1.0 / (k + rank)
+
+    for rank, item in enumerate(bm25_results, 1):
+        key = f"{item.get('document_id')}_{item.get('chunk_index')}"
+        if key not in items:
+            items[key] = item
+        scores[key] = scores.get(key, 0.0) + 1.0 / (k + rank)
+
+    fused = []
+    for key, rrf_score in scores.items():
+        chunk_data = dict(items[key])
+        chunk_data["rrf_score"] = round(rrf_score, 6)
+        fused.append(chunk_data)
+
+    fused.sort(key=lambda x: x["rrf_score"], reverse=True)
+    return fused[:top_k]
+
+
+def apply_parent_context_expansion(
+    chunks: List[Dict[str, Any]],
+    max_context_chars: int = 16000  # ~4000 tokens safe budget
+) -> List[Dict[str, Any]]:
+    """
+    Expands child chunks into their parent section text when available,
+    enforcing a strict token/character budget to prevent LLM context overflow.
+    Saves child content in 'child_content' so citations remain exact.
+    """
+    expanded_results: List[Dict[str, Any]] = []
+    seen_parent_ids = set()
+    total_chars = 0
+
+    for chunk in chunks:
+        res_chunk = dict(chunk)
+        res_chunk["child_content"] = chunk.get("content", "")
+        parent_content = chunk.get("parent_content")
+        parent_id = chunk.get("parent_id")
+
+        if parent_content and parent_content.strip():
+            if parent_id and parent_id in seen_parent_ids:
+                # Parent section was already included by an earlier chunk; keep child chunk
+                res_chunk["is_parent_expanded"] = False
+                res_chunk["content"] = chunk["content"]
+            elif total_chars + len(parent_content) <= max_context_chars:
+                res_chunk["content"] = parent_content
+                res_chunk["is_parent_expanded"] = True
+                if parent_id:
+                    seen_parent_ids.add(parent_id)
+                total_chars += len(parent_content)
+            else:
+                # Exceeds budget: fall back to smaller child chunk
+                res_chunk["content"] = chunk["content"]
+                res_chunk["is_parent_expanded"] = False
+                total_chars += len(chunk["content"])
+        else:
+            res_chunk["content"] = chunk["content"]
+            res_chunk["is_parent_expanded"] = False
+            total_chars += len(chunk["content"])
+
+        expanded_results.append(res_chunk)
+
+    return expanded_results
+
+
 def search_relevant_chunks(
     db: Session,
     user_id: str,
@@ -337,21 +501,26 @@ def search_relevant_chunks(
     context_document_ids: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
     """
-    Full retrieval pipeline:
-      1. Bi-encoder vector search (Qdrant, top-20 candidates)
-      2. Debug log: top-10 raw candidates with scores BEFORE re-ranking
-      3. Cross-encoder re-ranking
-      4. HARD score threshold
-      5. PARENT-SECTION EXPANSION for workflow/process queries
+    Full upgraded retrieval pipeline:
+      1. Hybrid Candidate Retrieval:
+         - Bi-encoder dense vector search (Qdrant, top 20)
+         - BM25Okapi keyword search (DB, top 20)
+         - Reciprocal Rank Fusion (RRF) -> top 20 merged candidates
+      2. Stage 1 Timing Log
+      3. Cross-Encoder Re-ranking (ms-marco-MiniLM-L-6-v2) -> top 6-8
+      4. Stage 2 Timing Log
+      5. Parent Context Expansion (budget-capped at ~4000 tokens / 16k chars)
+      6. Process / Workflow section expansion fallback
     """
+    import time
     if not query.strip():
         return []
 
+    t0 = time.time()
+    vector_results = []
+
+    # 1. Dense vector search
     try:
-        logger.info(
-            f"[Retrieval] Query: '{query[:80]}' | "
-            f"bi-encoder='{EMBEDDING_MODEL_NAME}' | candidates_k={QDRANT_CANDIDATE_K}"
-        )
         query_embeddings = generate_embeddings([query])
         if query_embeddings:
             query_vector = query_embeddings[0]
@@ -361,65 +530,80 @@ def search_relevant_chunks(
                 top_k=QDRANT_CANDIDATE_K,
                 context_document_ids=context_document_ids
             )
-
             if vector_results:
-                non_fm = [
+                vector_results = [
                     r for r in vector_results
                     if not r.get("is_frontmatter")
                     and not is_boilerplate_text(r.get("content", ""), r.get("page", 1))
                 ]
-                candidates = non_fm if non_fm else vector_results
-
-                logger.info(f"[Retrieval] RAW Qdrant results BEFORE re-ranking for query='{query[:60]}':")
-                for i, r in enumerate(candidates[:DEBUG_LOG_TOP_N], 1):
-                    logger.info(
-                        f"  RAW[{i:02d}] cosine={r.get('score', 0):.4f} | "
-                        f"sec='{r.get('section_number', 'N/A')}' | "
-                        f"page={r.get('page', '?'):>4} | "
-                        f"doc='{r.get('document_title', 'Unknown')[:45]}'"
-                    )
-
-                reranked = rerank_chunks(
-                    query=query,
-                    candidates=candidates,
-                    top_k=top_k,
-                    min_score=RERANK_MIN_SCORE,
-                )
-
-                if reranked:
-                    logger.info(f"[Retrieval] FINAL results after re-ranking ({len(reranked)} chunks):")
-                    for i, r in enumerate(reranked, 1):
-                        logger.info(
-                            f"  FINAL[{i}] rerank={r.get('rerank_score', 'N/A'):.4f} | "
-                            f"sec='{r.get('section_number', 'N/A')}' | "
-                            f"page={r.get('page', '?')} | "
-                            f"doc='{r.get('document_title', 'Unknown')[:50]}'"
-                        )
-                    # Expand parent section if this is a process/workflow query
-                    expanded = expand_parent_section_chunks(db, reranked, query)
-                    return expanded
-                else:
-                    logger.warning(
-                        f"[Retrieval] Qdrant search 0 chunks passed threshold {RERANK_MIN_SCORE}. Trying SQL fallback..."
-                    )
-                    return _sql_keyword_search(db, user_id, query, top_k, context_document_ids)
-
     except Exception as ve:
-        logger.warning(f"[Retrieval] Qdrant search error, falling back to SQL: {ve}")
+        logger.warning(f"[Retrieval] Qdrant search warning: {ve}")
+        vector_results = []
 
-    return _sql_keyword_search(db, user_id, query, top_k, context_document_ids)
+    # 2. BM25 keyword search
+    bm25_results = _bm25_search(
+        db=db,
+        user_id=user_id,
+        query=query,
+        top_k=QDRANT_CANDIDATE_K,
+        context_document_ids=context_document_ids
+    )
+
+    # 3. Hybrid Fusion via Reciprocal Rank Fusion (RRF)
+    if vector_results and bm25_results:
+        candidates = reciprocal_rank_fusion(vector_results, bm25_results, k=60, top_k=QDRANT_CANDIDATE_K)
+    elif vector_results:
+        candidates = vector_results
+    elif bm25_results:
+        candidates = bm25_results
+    else:
+        # Fallback to legacy SQL keyword search if both empty
+        candidates = _sql_keyword_candidates(db, user_id, query, QDRANT_CANDIDATE_K, context_document_ids)
+
+    t1 = time.time()
+    logger.info(
+        f"[Timing] Stage 1 Hybrid Retrieval (Dense={len(vector_results)}, BM25={len(bm25_results)}, "
+        f"Fused={len(candidates)}) took {t1 - t0:.3f}s"
+    )
+
+    if not candidates:
+        logger.warning(f"[Retrieval] No candidate chunks found for query: '{query[:60]}'")
+        return []
+
+    # 4. Cross-Encoder Re-ranking
+    reranked = rerank_chunks(
+        query=query,
+        candidates=candidates,
+        top_k=top_k,
+        min_score=RERANK_MIN_SCORE,
+    )
+
+    t2 = time.time()
+    logger.info(f"[Timing] Stage 2 Cross-Encoder Reranking took {t2 - t1:.3f}s (returned {len(reranked)} chunks)")
+
+    if not reranked:
+        logger.warning(f"[Retrieval] All candidates failed rerank min_score={RERANK_MIN_SCORE}.")
+        return []
+
+    # 5. Check if workflow expansion needed
+    if is_workflow_query(query):
+        expanded = expand_parent_section_chunks(db, reranked, query)
+        if expanded and len(expanded) >= 3:
+            return apply_parent_context_expansion(expanded)
+
+    # 6. Apply Parent Context Expansion with token budget protection
+    final_expanded = apply_parent_context_expansion(reranked)
+    return final_expanded
 
 
-def _sql_keyword_search(
+def _sql_keyword_candidates(
     db: Session,
     user_id: str,
     query: str,
     top_k: int,
     context_document_ids: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
-    """SQL keyword search with section metadata and parent expansion."""
-    logger.info(f"[Retrieval] SQL keyword fallback for query='{query[:60]}'")
-
+    """Legacy SQL keyword candidate fallback when Qdrant and BM25 are unavailable."""
     query_builder = db.query(Document).filter(
         (Document.uploaded_by == user_id) | (Document.is_knowledge_base == True)
     )
@@ -438,18 +622,7 @@ def _sql_keyword_search(
         return []
 
     raw_tokens = [t.lower() for t in query.split()]
-    keywords: set = set()
-    for token in raw_tokens:
-        if token in _STOPWORDS:
-            continue
-        keywords.add(token)
-        if token in _ACRONYM_MAP:
-            for exp_word in _ACRONYM_MAP[token].split():
-                if exp_word not in _STOPWORDS:
-                    keywords.add(exp_word)
-
-    if not keywords:
-        keywords = {t for t in raw_tokens if t not in _STOPWORDS}
+    keywords = {t for t in raw_tokens if t not in _STOPWORDS}
     if not keywords:
         keywords = set(raw_tokens)
 
@@ -467,18 +640,10 @@ def _sql_keyword_search(
         if score > 0.5:
             scored_chunks.append({"chunk": c, "document": doc, "score": score})
 
-    if not scored_chunks:
-        return []
-
-    non_bp = [sc for sc in scored_chunks
-              if not is_boilerplate_text(sc["chunk"].content, sc["chunk"].page_number or 1)]
-    if non_bp:
-        scored_chunks = non_bp
-
     scored_chunks.sort(key=lambda x: x["score"], reverse=True)
 
     sql_raw = []
-    for item in scored_chunks[:QDRANT_CANDIDATE_K]:
+    for item in scored_chunks[:top_k]:
         c = item["chunk"]
         d = item["document"]
         sql_raw.append({
@@ -486,23 +651,14 @@ def _sql_keyword_search(
             "document_title": d.title,
             "content": c.content,
             "page": c.page_number or 1,
+            "page_start": getattr(c, "page_start", c.page_number or 1),
+            "page_end": getattr(c, "page_end", c.page_number or 1),
             "chunk_index": c.chunk_index,
             "section_number": c.section_number,
             "section_title": c.section_title,
             "parent_section": c.parent_section,
+            "parent_id": getattr(c, "parent_id", None),
+            "parent_content": getattr(c, "parent_content", None),
             "score": round(float(item["score"]), 4),
         })
-
-    SQL_RERANK_THRESHOLD = 0.35
-    reranked_sql = rerank_chunks(
-        query=query,
-        candidates=sql_raw,
-        top_k=top_k,
-        min_score=SQL_RERANK_THRESHOLD,
-    )
-
-    if reranked_sql:
-        expanded_sql = expand_parent_section_chunks(db, reranked_sql, query)
-        return expanded_sql
-
-    return []
+    return sql_raw

@@ -129,43 +129,196 @@ def parse_heading_info(line: str, current_parent: Optional[str] = None) -> Tuple
     return None, sec_title, current_parent
 
 
+_ABBREVIATIONS = {
+    "mr", "mrs", "ms", "dr", "prof", "sr", "jr", "vs", "etc", "fig", "figs",
+    "al", "e.g", "i.e", "vol", "no", "dept", "approx", "est", "inc", "ltd", "corp",
+    "co", "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "oct", "nov", "dec"
+}
+
+
+def split_into_sentences(text: str) -> List[str]:
+    """
+    Splits text into complete sentences, respecting abbreviations, decimals, and numbered lists.
+    Guarantees no sentence is cut mid-thought.
+    """
+    if not text or not text.strip():
+        return []
+
+    cleaned = text.strip()
+    # Split on sentence terminals followed by space and an uppercase letter / quote / bracket
+    raw_splits = re.split(r'(?<=[.!?])\s+(?=[A-Z0-9"\'\(\[])', cleaned)
+    sentences: List[str] = []
+    buffer = ""
+
+    for part in raw_splits:
+        part_str = part.strip()
+        if not part_str:
+            continue
+        if buffer:
+            buffer += " " + part_str
+        else:
+            buffer = part_str
+
+        # Check if the buffer ends on a common abbreviation (e.g. "Fig.", "e.g.", "Dr.")
+        last_word_match = re.search(r'\b([a-zA-Z\.]+)\s*$', buffer)
+        if last_word_match:
+            last_word = last_word_match.group(1).lower().rstrip('.')
+            if last_word in _ABBREVIATIONS or re.search(r'^\d+\.$', last_word_match.group(1)):
+                continue
+
+        sentences.append(buffer)
+        buffer = ""
+
+    if buffer:
+        sentences.append(buffer)
+
+    return [s.strip() for s in sentences if s.strip()]
+
+
+def build_contextual_chunk_header(
+    doc_title: str,
+    section_title: Optional[str] = None,
+    section_num: Optional[str] = None
+) -> str:
+    """Creates a short header combining document title and nearest section heading."""
+    title = (doc_title or "Document").strip()
+    sec = (section_title or section_num or "General").strip()
+    return f"[{title} — {sec}]"
+
+
+def build_embedding_input(
+    doc_title: str,
+    section_title: Optional[str],
+    section_num: Optional[str],
+    chunk_content: str
+) -> str:
+    """
+    Prepends contextual header to chunk text purely for generating embeddings.
+    Original raw chunk_content is stored in DB/payload for user viewing.
+    """
+    header = build_contextual_chunk_header(doc_title, section_title, section_num)
+    return f"{header}\n{chunk_content.strip()}"
+
+
+def _split_paragraph_by_sentences(
+    para: str,
+    chunk_size: int = 450,
+    overlap_words: int = 65
+) -> List[str]:
+    """Splits an oversized paragraph into complete sentence chunks."""
+    sentences = split_into_sentences(para)
+    if not sentences:
+        return [para] if para.strip() else []
+
+    chunks: List[str] = []
+    current_sentences: List[str] = []
+    current_word_count = 0
+
+    for sent in sentences:
+        sent_words = len(sent.split())
+        if current_sentences and current_word_count + sent_words > chunk_size:
+            chunk_str = " ".join(current_sentences).strip()
+            if chunk_str:
+                chunks.append(chunk_str)
+
+            # Build sentence overlap for continuity
+            overlap_sents: List[str] = []
+            overlap_count = 0
+            for prev_sent in reversed(current_sentences):
+                s_words = len(prev_sent.split())
+                if overlap_count + s_words <= overlap_words or not overlap_sents:
+                    overlap_sents.insert(0, prev_sent)
+                    overlap_count += s_words
+                else:
+                    break
+
+            current_sentences = overlap_sents[:]
+            current_word_count = sum(len(s.split()) for s in current_sentences)
+
+        current_sentences.append(sent)
+        current_word_count += sent_words
+
+    if current_sentences:
+        chunk_str = " ".join(current_sentences).strip()
+        if chunk_str:
+            chunks.append(chunk_str)
+
+    return chunks
+
+
 def chunk_text(
     text: str,
-    chunk_size: int = 400,
-    overlap: int = 75
+    page_number: int = 1,
+    chunk_size: int = 450,
+    overlap: int = 65,
+    doc_title: str = "Document"
 ) -> List[Dict[str, Any]]:
     """
-    Structure-aware chunker that respects document headings, sections, and chapters.
-
-    Process:
-      1) Identifies section and chapter boundaries using regex.
-      2) Extracts heading metadata: section_number, section_title, parent_section.
-      3) Keeps complete sub-sections intact when word count <= chunk_size (or up to ~450 words).
-      4) Performs paragraph-grouped splitting only when a section is oversized.
-      5) Attaches structural metadata to every chunk for downstream retrieval & ordering.
+    Structure-aware chunker that respects document headings, paragraph boundaries, and sentence terminals.
+    Ensures chunk boundaries ALWAYS land on complete sentences, never cutting mid-sentence.
+    Generates parent-child links grouping consecutive chunks into parent sections.
     """
     chunks: List[Dict[str, Any]] = []
     if not text or not text.strip():
         return chunks
 
-    # Find section header matches and positions
     matches = list(_SECTION_HEADER_PATTERN.finditer(text))
 
     if not matches:
-        # No headings detected — fallback to single section
-        raw_chunks = _split_flat_text(text, chunk_size=chunk_size, overlap=overlap)
-        for idx, rc in enumerate(raw_chunks):
+        # No headings detected — split by paragraphs and sentences
+        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+        raw_text_chunks: List[str] = []
+
+        for para in paragraphs:
+            p_words = len(para.split())
+            if p_words > chunk_size:
+                raw_text_chunks.extend(_split_paragraph_by_sentences(para, chunk_size=chunk_size, overlap_words=overlap))
+            else:
+                raw_text_chunks.append(para)
+
+        # Merge small consecutive paragraphs up to chunk_size
+        merged_chunks: List[str] = []
+        curr_block: List[str] = []
+        curr_words = 0
+
+        for item in raw_text_chunks:
+            item_words = len(item.split())
+            if curr_block and curr_words + item_words > chunk_size:
+                merged_chunks.append("\n\n".join(curr_block))
+                curr_block = [item]
+                curr_words = item_words
+            else:
+                curr_block.append(item)
+                curr_words += item_words
+
+        if curr_block:
+            merged_chunks.append("\n\n".join(curr_block))
+
+        # Build parent grouping (combine every 3 child chunks)
+        parent_group_size = 3
+        for idx, content in enumerate(merged_chunks):
+            parent_idx = idx // parent_group_size
+            parent_id = f"parent_{page_number}_{parent_idx}"
+            parent_slice = merged_chunks[parent_idx * parent_group_size : (parent_idx + 1) * parent_group_size]
+            parent_content = "\n\n".join(parent_slice)
+
             chunks.append({
                 "chunk_index": idx,
-                "content": rc["content"],
-                "tokens": rc["tokens"],
+                "content": content,
+                "tokens": len(content.split()),
+                "page_number": page_number,
+                "page_start": page_number,
+                "page_end": page_number,
                 "section_number": None,
                 "section_title": None,
-                "parent_section": None
+                "parent_section": None,
+                "parent_id": parent_id,
+                "parent_content": parent_content,
+                "embedding_input": build_embedding_input(doc_title, None, None, content)
             })
         return chunks
 
-    # Build section blocks from header matches
+    # Headings detected: build section blocks
     sections_raw: List[Dict[str, Any]] = []
     for i, m in enumerate(matches):
         start_pos = m.start()
@@ -177,7 +330,6 @@ def chunk_text(
             "block_text": block_text
         })
 
-    # Include any leading text before the first header
     if matches[0].start() > 0:
         leading_text = text[:matches[0].start()].strip()
         if leading_text:
@@ -189,84 +341,83 @@ def chunk_text(
     current_parent: Optional[str] = None
     chunk_index = 0
 
-    for s_item in sections_raw:
+    for sec_idx, s_item in enumerate(sections_raw):
         header_line = s_item["header_text"]
         block_text = s_item["block_text"]
 
         if not block_text:
             continue
 
-        # Parse section heading metadata
         sec_num, sec_title, new_parent = parse_heading_info(header_line, current_parent=current_parent)
         if new_parent and new_parent != current_parent:
             current_parent = new_parent
 
-        # Compute word count of this section block
         words = block_text.split()
+        section_parent_id = f"sec_parent_{page_number}_{sec_idx}"
+        section_parent_content = block_text
 
-        # If section is self-contained and reasonably sized (<= 450 words), keep as ONE complete chunk!
+        # If section is reasonably sized (<= 450 words), keep as ONE intact chunk
         if len(words) <= chunk_size + 50:
             chunks.append({
                 "chunk_index": chunk_index,
                 "content": block_text,
                 "tokens": len(words),
+                "page_number": page_number,
+                "page_start": page_number,
+                "page_end": page_number,
                 "section_number": sec_num,
                 "section_title": sec_title,
-                "parent_section": current_parent
+                "parent_section": current_parent,
+                "parent_id": section_parent_id,
+                "parent_content": section_parent_content,
+                "embedding_input": build_embedding_input(doc_title, sec_title, sec_num, block_text)
             })
             chunk_index += 1
         else:
-            # Oversized section — split with paragraph grouping, keeping metadata on all sub-chunks
+            # Oversized section: split on paragraph and sentence boundaries
             paragraphs = [p.strip() for p in block_text.split("\n\n") if p.strip()]
+            sec_child_chunks: List[str] = []
 
-            if len(paragraphs) > 1:
-                current_words: List[str] = []
-                overlap_words: List[str] = []
+            for p in paragraphs:
+                if len(p.split()) > chunk_size:
+                    sec_child_chunks.extend(_split_paragraph_by_sentences(p, chunk_size=chunk_size, overlap_words=overlap))
+                else:
+                    sec_child_chunks.append(p)
 
-                for para in paragraphs:
-                    para_words = para.split()
-                    if current_words and len(current_words) + len(para_words) > chunk_size:
-                        chunk_str = " ".join(current_words)
-                        chunks.append({
-                            "chunk_index": chunk_index,
-                            "content": chunk_str,
-                            "tokens": len(current_words),
-                            "section_number": sec_num,
-                            "section_title": sec_title,
-                            "parent_section": current_parent
-                        })
-                        chunk_index += 1
-                        overlap_words = current_words[-overlap:] if len(current_words) > overlap else current_words[:]
-                        current_words = overlap_words[:]
+            # Merge smaller paragraphs to target chunk_size
+            merged_sec_chunks: List[str] = []
+            curr_sec_block: List[str] = []
+            curr_sec_words = 0
 
-                    current_words.extend(para_words)
+            for sc in sec_child_chunks:
+                sc_words = len(sc.split())
+                if curr_sec_block and curr_sec_words + sc_words > chunk_size:
+                    merged_sec_chunks.append("\n\n".join(curr_sec_block))
+                    curr_sec_block = [sc]
+                    curr_sec_words = sc_words
+                else:
+                    curr_sec_block.append(sc)
+                    curr_sec_words += sc_words
 
-                if current_words:
-                    chunk_str = " ".join(current_words)
-                    chunks.append({
-                        "chunk_index": chunk_index,
-                        "content": chunk_str,
-                        "tokens": len(current_words),
-                        "section_number": sec_num,
-                        "section_title": sec_title,
-                        "parent_section": current_parent
-                    })
-                    chunk_index += 1
-            else:
-                # Single large paragraph — flat word-count split
-                step = chunk_size - overlap
-                for i in range(0, len(words), step):
-                    chunk_words = words[i:i + chunk_size]
-                    chunk_str = " ".join(chunk_words)
-                    chunks.append({
-                        "chunk_index": chunk_index,
-                        "content": chunk_str,
-                        "tokens": len(chunk_words),
-                        "section_number": sec_num,
-                        "section_title": sec_title,
-                        "parent_section": current_parent
-                    })
-                    chunk_index += 1
+            if curr_sec_block:
+                merged_sec_chunks.append("\n\n".join(curr_sec_block))
+
+            for sc_content in merged_sec_chunks:
+                chunks.append({
+                    "chunk_index": chunk_index,
+                    "content": sc_content,
+                    "tokens": len(sc_content.split()),
+                    "page_number": page_number,
+                    "page_start": page_number,
+                    "page_end": page_number,
+                    "section_number": sec_num,
+                    "section_title": sec_title,
+                    "parent_section": current_parent,
+                    "parent_id": section_parent_id,
+                    "parent_content": section_parent_content,
+                    "embedding_input": build_embedding_input(doc_title, sec_title, sec_num, sc_content)
+                })
+                chunk_index += 1
 
     return chunks
 

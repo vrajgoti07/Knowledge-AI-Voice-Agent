@@ -9,6 +9,7 @@ from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.citation import Citation
 from app.services.chat_service import generate_rag_response
+from app.services.llm_provider import generate_conversation_summary
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,35 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str):
                     await websocket.send_text(json.dumps({"type": "error", "content": "Conversation not found"}))
                     continue
 
+                # 1. Fetch recent messages BEFORE adding new user message
+                recent_messages = (
+                    db.query(Message)
+                    .filter(Message.conversation_id == conv.id)
+                    .order_by(Message.created_at.desc())
+                    .limit(8)
+                    .all()
+                )
+                recent_messages.reverse()
+
+                # 2. Context window summary for long threads
+                total_msgs_count = db.query(Message).filter(Message.conversation_id == conv.id).count()
+                if total_msgs_count > 8 and (total_msgs_count % 10 == 0 or not conv.running_summary):
+                    try:
+                        all_prior_msgs = (
+                            db.query(Message)
+                            .filter(Message.conversation_id == conv.id)
+                            .order_by(Message.created_at.asc())
+                            .all()
+                        )
+                        msgs_to_summarize = all_prior_msgs[:-8] if len(all_prior_msgs) > 8 else all_prior_msgs
+                        if msgs_to_summarize:
+                            new_summary = generate_conversation_summary(msgs_to_summarize, conv.running_summary)
+                            if new_summary:
+                                conv.running_summary = new_summary
+                                db.flush()
+                    except Exception as sum_err:
+                        logger.warning(f"Failed to generate running summary in WS: {sum_err}")
+
                 user_msg = Message(
                     conversation_id=conv.id,
                     role="user",
@@ -51,6 +81,8 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str):
                         user_id=conv.user_id,
                         conversation_id=conv.id,
                         user_query=query,
+                        conversation_history=recent_messages,
+                        running_summary=getattr(conv, 'running_summary', None),
                     )
                     t_end = time.time()
                     logger.info(

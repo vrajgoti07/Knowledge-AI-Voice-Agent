@@ -6,11 +6,16 @@ from typing import List, Dict, Tuple
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.services.retrieval_service import search_relevant_chunks
-from app.services.llm_provider import generate_answer, classify_question_llm
+from app.services.llm_provider import (
+    generate_answer,
+    classify_question_llm,
+    rewrite_query_with_context,
+)
 
 logger = logging.getLogger(__name__)
 
 RAG_TOTAL_TIMEOUT_SECONDS = 90  # Max time for the entire RAG pipeline
+
 
 _DEF_PATTERNS = [
     re.compile(r'^\s*(?:what\s+is|what\s+are|define|what\s+does\s+.*\s+mean)\b', re.IGNORECASE),
@@ -90,7 +95,9 @@ def generate_rag_response(
     user_id: str,
     conversation_id: str,
     user_query: str,
-    context_document_ids: List[str] = None
+    context_document_ids: List[str] = None,
+    conversation_history: List[any] = None,
+    running_summary: str = None,
 ) -> Tuple[str, List[Dict[str, any]], Dict[str, any]]:
     """
     Generates a RAG response with a total pipeline timeout.
@@ -102,12 +109,14 @@ def generate_rag_response(
         metadata_dict contains:
             provider : str  — "gemini" | "groq" | "ollama" | "fallback"
             degraded : bool — True if all LLMs failed and raw chunks were returned
+            rewritten_query : str — query used for retrieval after context resolution
     """
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(
                 _generate_rag_response_core,
-                db, user_id, conversation_id, user_query, context_document_ids
+                db, user_id, conversation_id, user_query, context_document_ids,
+                conversation_history, running_summary
             )
             return future.result(timeout=RAG_TOTAL_TIMEOUT_SECONDS)
     except concurrent.futures.TimeoutError:
@@ -132,18 +141,31 @@ def _generate_rag_response_core(
     user_id: str,
     conversation_id: str,
     user_query: str,
-    context_document_ids: List[str] = None
+    context_document_ids: List[str] = None,
+    conversation_history: List[any] = None,
+    running_summary: str = None,
 ) -> Tuple[str, List[Dict[str, any]], Dict[str, any]]:
     t0 = time.time()
 
-    # ── STAGE 0: QUESTION TYPE CLASSIFICATION ──────────────────────
-    question_type = classify_question_type(user_query)
-    logger.info(f"[RAG Timing] Question Type for query '{user_query[:50]}': {question_type}")
+    # ── STAGE 0A: CONTEXT-AWARE QUERY REWRITING ────────────────────
+    retrieval_query = rewrite_query_with_context(
+        user_query=user_query,
+        conversation_history=conversation_history,
+        running_summary=running_summary,
+    )
+    if retrieval_query != user_query:
+        logger.info(f"[RAG] Query rewritten for retrieval: '{user_query}' -> '{retrieval_query}'")
+    else:
+        logger.info(f"[RAG] Using standalone query: '{user_query}'")
+
+    # ── STAGE 0B: QUESTION TYPE CLASSIFICATION ─────────────────────
+    question_type = classify_question_type(retrieval_query)
+    logger.info(f"[RAG Timing] Question Type for query '{retrieval_query[:50]}': {question_type}")
 
     # ── STAGE 1: VECTOR RETRIEVAL ──────────────────────────────────
     try:
         retrieved_chunks = search_relevant_chunks(
-            db, user_id=user_id, query=user_query, top_k=8, context_document_ids=context_document_ids
+            db, user_id=user_id, query=retrieval_query, top_k=8, context_document_ids=context_document_ids
         )
     except Exception as ret_err:
         logger.error(f"[RAG Timing] Retrieval Exception: {ret_err}", exc_info=True)
@@ -176,6 +198,8 @@ def _generate_rag_response_core(
         retrieved_chunks=retrieved_chunks,
         zero_chunk_mode=zero_chunk_mode,
         question_type=question_type,
+        conversation_history=conversation_history,
+        running_summary=running_summary,
     )
 
     t3 = time.time()
@@ -189,6 +213,7 @@ def _generate_rag_response_core(
         "degraded": llm_result["degraded"],
         "speech_text": llm_result.get("speech_text", llm_result["answer"]),
         "question_type": question_type,
+        "rewritten_query": retrieval_query,
     }
 
     return llm_result["answer"], citations_data, metadata

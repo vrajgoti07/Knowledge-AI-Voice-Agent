@@ -27,23 +27,28 @@ Base = declarative_base()
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    statements = [
+        "ALTER TABLE documents ADD COLUMN IF NOT EXISTS checksum VARCHAR",
+        "ALTER TABLE documents ADD COLUMN IF NOT EXISTS error_message TEXT",
+        "ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS section_number VARCHAR",
+        "ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS section_title VARCHAR",
+        "ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS parent_section VARCHAR",
+        "ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS parent_id VARCHAR",
+        "ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS parent_content TEXT",
+        "ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS page_start INTEGER",
+        "ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS page_end INTEGER",
+        "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS running_summary TEXT",
+    ]
     with engine.connect() as conn:
-        try:
-            conn.execute(text("ALTER TABLE documents ADD COLUMN checksum VARCHAR"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE documents ADD COLUMN error_message TEXT"))
-            conn.commit()
-        except Exception:
-            pass
-        for col in ["section_number", "section_title", "parent_section"]:
+        for stmt in statements:
             try:
-                conn.execute(text(f"ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS {col} VARCHAR"))
+                conn.execute(text(stmt))
                 conn.commit()
             except Exception:
-                pass
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
 
 def get_db():
     db = SessionLocal()

@@ -50,6 +50,7 @@ class ConversationResponse(BaseModel):
     updated_at: str = Field(alias="updatedAt")
     model: Optional[str] = "Gemini 2.5 Flash"
     pinned: Optional[bool] = False
+    running_summary: Optional[str] = Field(default=None, alias="runningSummary")
 
     model_config = ConfigDict(
         from_attributes=True,

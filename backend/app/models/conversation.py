@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, JSON
+from sqlalchemy import Column, String, Boolean, DateTime, JSON, Text
 from app.db.session import Base
 
 class Conversation(Base):
@@ -12,5 +12,6 @@ class Conversation(Base):
     document_ids = Column(JSON, default=list)
     model = Column(String, default="Gemini 2.5 Flash")
     pinned = Column(Boolean, default=False)
+    running_summary = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

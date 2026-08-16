@@ -349,13 +349,17 @@ def process_document_background(
             for page_info in pages_data:
                 p_num = page_info["page_number"]
                 p_text = page_info["text"]
-                c_list = chunk_text(p_text)
+                c_list = chunk_text(p_text, page_number=p_num, doc_title=doc.title)
 
                 for c in c_list:
                     is_fm = is_boilerplate_text(c["content"], p_num)
                     sec_num = c.get("section_number")
                     sec_title = c.get("section_title")
                     parent_sec = c.get("parent_section")
+                    parent_id = c.get("parent_id")
+                    parent_content = c.get("parent_content")
+                    p_start = c.get("page_start", p_num)
+                    p_end = c.get("page_end", p_num)
 
                     chunk_obj = DocumentChunk(
                         document_id=doc.id,
@@ -363,9 +367,13 @@ def process_document_background(
                         content=c["content"],
                         tokens=c["tokens"],
                         page_number=p_num,
+                        page_start=p_start,
+                        page_end=p_end,
                         section_number=sec_num,
                         section_title=sec_title,
-                        parent_section=parent_sec
+                        parent_section=parent_sec,
+                        parent_id=parent_id,
+                        parent_content=parent_content,
                     )
                     db.add(chunk_obj)
 
@@ -374,10 +382,15 @@ def process_document_background(
                         "content": c["content"],
                         "tokens": c["tokens"],
                         "page_number": p_num,
+                        "page_start": p_start,
+                        "page_end": p_end,
                         "is_frontmatter": is_fm,
                         "section_number": sec_num,
                         "section_title": sec_title,
-                        "parent_section": parent_sec
+                        "parent_section": parent_sec,
+                        "parent_id": parent_id,
+                        "parent_content": parent_content,
+                        "embedding_input": c.get("embedding_input", c["content"]),
                     })
 
                     # Log metadata for the first 20 chunks for verification
@@ -437,9 +450,9 @@ def process_document_background(
 
         if created_chunks_list:
             def _embed_and_upsert():
-                chunk_texts = [c["content"] for c in created_chunks_list]
-                logger.info(f"[{doc_id}] Generating embeddings for {len(chunk_texts)} chunks...")
-                embeddings = generate_embeddings(chunk_texts)
+                embedding_inputs = [c.get("embedding_input", c["content"]) for c in created_chunks_list]
+                logger.info(f"[{doc_id}] Generating embeddings for {len(embedding_inputs)} contextual chunk headers...")
+                embeddings = generate_embeddings(embedding_inputs)
                 logger.info(f"[{doc_id}] Upserting {len(embeddings)} vectors into Qdrant collection...")
                 upsert_document_chunks(
                     doc_id=doc.id,

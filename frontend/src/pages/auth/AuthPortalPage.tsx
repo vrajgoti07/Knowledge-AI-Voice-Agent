@@ -1,10 +1,12 @@
 // ============================================================
 // AuthPortalPage — AI Voice Agent Authentication Gateway
-// Screen 1: Login ("Authorize Voice Session")
-// Screen 2: Sign Up ("Initialize Voice Agent Node")
+// Screen 1: Login ("Authorize Voice Session") -> VoiceprintResonatorBackground
+// Screen 2: Sign Up ("Initialize Voice Agent Node") -> NeuralNodeClusterBackground
 // Features:
-// 1. Global AuthHeaderControls: Top-Left glassmorphic "← Back" button & "Acoustic Core: Online" badge.
-// 2. Multi-Layer CyberAcousticBackground: Coordinate Grid + Neural Constellation + Sine Waves + Spotlights.
+// 1. Distinct Dedicated Backgrounds:
+//    - Login: VoiceprintResonatorBackground (3D Acoustic Resonator Vortex & Radial Rays).
+//    - Sign Up: NeuralNodeClusterBackground (3D Synaptic Voice Node Matrix & Laser Streams).
+// 2. Global AuthHeaderControls: Top-Left glassmorphic "← Back" button & "Acoustic Core: Online" badge.
 // 3. Glassmorphic VoiceAuthCard with interactive 3D VoiceAgentOrb header.
 // 4. Soundwave-styled inputs with autofill shields and inline password reveal.
 // 5. Acoustic primary CTA button with animated mini equalizer bars on hover.
@@ -21,7 +23,7 @@ import { toast } from '@/store/uiStore'
 import { apiPost } from '@/services/api'
 import { ROUTES } from '@/constants'
 import { AuthHeaderControls } from '@/components/auth/AuthHeaderControls'
-import { CyberAcousticBackground } from '@/components/auth/CyberAcousticBackground'
+import { VoiceprintResonatorBackground } from '@/components/auth/VoiceprintResonatorBackground'
 import { VoiceAuthCard } from '@/components/auth/VoiceAuthCard'
 import { CyberInput } from '@/components/auth/CyberInput'
 import type { User as UserType } from '@/types'
@@ -167,8 +169,8 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
       {/* ── 1. GLOBAL TOP-LEFT BACK BUTTON & TOP-RIGHT STATUS BADGE ──── */}
       <AuthHeaderControls backTo="/" backLabel="Back to Home" />
 
-      {/* ── 2. MULTI-LAYER CYBER-ACOUSTIC BACKGROUND ─────────────────── */}
-      <CyberAcousticBackground activityLevel={activityLevel} />
+      {/* ── 2. HOLOGRAPHIC CYBER-ACOUSTIC MATRIX (Sign In & Sign Up) ── */}
+      <VoiceprintResonatorBackground activityLevel={activityLevel} />
 
       {/* ── 3. CENTRAL GLASSMORPHIC VOICE AUTH CARD ──────────────────── */}
       <VoiceAuthCard

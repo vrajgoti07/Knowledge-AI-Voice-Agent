@@ -22,10 +22,31 @@ from app.core.config import settings
 logger = logging.getLogger("knowledge_ai.llm_provider")
 
 _provider_state: Dict[str, Dict[str, Any]] = {
-    "gemini": {"enabled": False, "status": "not_configured", "reason": ""},
+    "groq": {"enabled": False, "status": "not_configured", "reason": ""},
+    "gemini": {"enabled": False, "status": "paused", "reason": "Paused by user configuration (using Groq)"},
 }
 
+_groq_client = None
 _genai = None
+_TIMEOUT = None
+
+
+def _get_groq_client():
+    global _groq_client
+    if _groq_client is None:
+        try:
+            from groq import Groq
+            api_key = (settings.GROQ_API_KEY or "").strip()
+            if api_key:
+                _groq_client = Groq(api_key=api_key)
+            else:
+                _groq_client = False
+        except ImportError:
+            _groq_client = False
+        except Exception as e:
+            logger.warning(f"[Groq] SDK init warning: {e}")
+            _groq_client = False
+    return _groq_client if _groq_client is not False else None
 
 
 def _get_genai():
@@ -43,9 +64,18 @@ def _get_genai():
     return _genai if _genai is not False else None
 
 
+def _validate_groq_key(key: str) -> tuple:
+    if not key:
+        return False, "GROQ_API_KEY is empty or missing"
+    key = key.strip()
+    if not key.startswith("gsk_"):
+        return False, f"GROQ_API_KEY format unrecognized ('{key[:10]}...')"
+    return True, "ok (valid gsk_ format)"
+
+
 def _validate_gemini_key(key: str) -> tuple:
     if not key:
-        return False, "GEMINI_API_KEY is empty or missing"
+        return False, "GEMINI_API_KEY is paused/empty"
     key = key.strip()
     is_legacy = key.startswith("AIzaSy")
     is_new_format = key.startswith("AQ.")
@@ -56,30 +86,49 @@ def _validate_gemini_key(key: str) -> tuple:
 
 def validate_providers_at_startup() -> None:
     global _provider_state
-    gemini_key = (settings.GEMINI_API_KEY or "").strip()
-    valid, reason = _validate_gemini_key(gemini_key)
-    if valid:
-        genai = _get_genai()
-        if genai is not None:
-            _provider_state["gemini"] = {"enabled": True, "status": "healthy", "reason": reason}
-        else:
-            _provider_state["gemini"] = {"enabled": False, "status": "sdk_missing", "reason": "google-generativeai package missing"}
+    # 1. Validate Groq (Primary)
+    groq_key = (settings.GROQ_API_KEY or "").strip()
+    groq_valid, groq_reason = _validate_groq_key(groq_key)
+    if groq_valid:
+        _provider_state["groq"] = {"enabled": True, "status": "healthy", "reason": groq_reason}
     else:
-        _provider_state["gemini"] = {"enabled": False, "status": "key_invalid", "reason": reason}
+        _provider_state["groq"] = {"enabled": False, "status": "key_missing", "reason": groq_reason}
 
-    p = _provider_state["gemini"]
-    icon = "✅" if p["enabled"] else "❌"
-    detail = p["reason"] if p["reason"] else p["status"]
-    banner = f"\n[LLM Status] {icon} GEMINI: {detail}\n"
+    # 2. Validate Gemini (Paused / Fallback)
+    gemini_key = (settings.GEMINI_API_KEY or "").strip()
+    gemini_valid, gemini_reason = _validate_gemini_key(gemini_key)
+    if gemini_valid and (settings.LLM_PROVIDER or "").lower() == "gemini":
+        _provider_state["gemini"] = {"enabled": True, "status": "healthy", "reason": gemini_reason}
+    elif gemini_valid:
+        _provider_state["gemini"] = {"enabled": False, "status": "paused", "reason": "Paused (Groq is active)"}
+    else:
+        _provider_state["gemini"] = {"enabled": False, "status": "paused", "reason": gemini_reason}
+
+    g_icon = "✅" if _provider_state["groq"]["enabled"] else "❌"
+    gm_icon = "✅" if _provider_state["gemini"]["enabled"] else "⏸️"
+    banner = (
+        f"\n[LLM Status] {g_icon} GROQ: {_provider_state['groq']['status']} ({_provider_state['groq']['reason']}) | "
+        f"{gm_icon} GEMINI: {_provider_state['gemini']['status']}\n"
+    )
     logger.info(banner)
 
 
 def get_provider_status() -> Dict[str, Any]:
-    p = _provider_state["gemini"]
+    active = "groq" if _provider_state["groq"]["enabled"] else ("gemini" if _provider_state["gemini"]["enabled"] else "fallback")
+    chain = []
+    if _provider_state["groq"]["enabled"]:
+        chain.append("groq")
+    if _provider_state["gemini"]["enabled"]:
+        chain.append("gemini")
+    chain.append("fallback")
+
     return {
-        "providers": {"gemini": {"enabled": p["enabled"], "status": p["status"]}},
-        "active_provider": "gemini" if p["enabled"] else "fallback",
-        "fallback_chain": ["gemini", "fallback"] if p["enabled"] else ["fallback"],
+        "providers": {
+            "groq": {"enabled": _provider_state["groq"]["enabled"], "status": _provider_state["groq"]["status"]},
+            "gemini": {"enabled": _provider_state["gemini"]["enabled"], "status": _provider_state["gemini"]["status"]},
+        },
+        "active_provider": active,
+        "fallback_chain": chain,
     }
 
 
@@ -422,12 +471,12 @@ def format_fallback_chunks(
 def _get_timeout() -> float:
     global _TIMEOUT
     if _TIMEOUT is None:
-        _TIMEOUT = float(settings.LLM_TIMEOUT_SECONDS or 10)
+        _TIMEOUT = float(settings.LLM_TIMEOUT_SECONDS or 30)
     return _TIMEOUT
 
 
 def classify_question_llm(query: str) -> Optional[str]:
-    """Issues a fast Gemini call to classify an ambiguous question into one of the 6 core types."""
+    """Issues a fast LLM call (Groq) to classify an ambiguous question into one of the 6 core types."""
     prompt = (
         "Classify the following user question into EXACTLY ONE of these categories: "
         "DEFINITION, EXPLANATION, LIST, COMPARISON, FORMULA, SUMMARY.\n\n"
@@ -441,7 +490,7 @@ def classify_question_llm(query: str) -> Optional[str]:
         f"Question: {query}\n"
         "Output ONLY the category name in capital letters."
     )
-    res = _call_gemini(prompt)
+    res, _ = _call_llm(prompt, max_tokens=50, temperature=0.0)
     if res:
         cleaned = res.strip().upper()
         for cat in ["DEFINITION", "EXPLANATION", "LIST", "COMPARISON", "FORMULA", "SUMMARY"]:
@@ -497,29 +546,229 @@ _STANDARD_FORMATTING_RULES = (
 )
 
 
-def _build_rag_prompt(query: str, context_str: str, question_type: str = "EXPLANATION") -> str:
-    type_instruction = _TYPE_INSTRUCTIONS.get(question_type, _TYPE_INSTRUCTIONS["EXPLANATION"])
-    return (
-        "You are Knowledge AI, an expert research assistant.\n"
-        "Answer the user's question using ONLY the provided document excerpts as your source of truth.\n\n"
-        f"{type_instruction}\n\n"
-        f"{_STANDARD_FORMATTING_RULES}\n\n"
-        f"DOCUMENT EXCERPTS:\n{context_str}\n\n"
-        f"USER QUESTION:\n{query}"
+def rewrite_query_with_context(
+    user_query: str,
+    conversation_history: Optional[List[Any]] = None,
+    running_summary: Optional[str] = None
+) -> str:
+    """
+    Rewrites a follow-up user query into a complete, standalone question using conversation context.
+    If the query is already standalone or no history exists, returns user_query as-is.
+    """
+    raw_query = (user_query or "").strip()
+    if not raw_query:
+        return ""
+
+    if not conversation_history and not running_summary:
+        return raw_query
+
+    relevant_history = [
+        m for m in (conversation_history or [])
+        if getattr(m, 'role', m.get('role') if isinstance(m, dict) else '') in ('user', 'assistant')
+    ]
+
+    if not relevant_history and not running_summary:
+        return raw_query
+
+    history_lines = []
+    if running_summary:
+        history_lines.append(f"Summary of earlier conversation: {running_summary}")
+
+    for m in relevant_history[-4:]:  # last 2 turns is usually enough
+        role = getattr(m, 'role', m.get('role') if isinstance(m, dict) else 'User')
+        role_label = 'User' if role == 'user' else 'Assistant'
+        content = getattr(m, 'content', m.get('content') if isinstance(m, dict) else '')
+        if content:
+            history_lines.append(f"{role_label}: {content}")
+
+    history_text = "\n".join(history_lines).strip()
+    if not history_text:
+        return raw_query
+
+    rewrite_prompt = f"""Given this recent conversation:
+{history_text}
+
+The user's new message is: "{raw_query}"
+
+If this new message is a follow-up that depends on the previous conversation (e.g. "explain that more," "give an example," "what about X" referring to something just discussed), rewrite it into a complete, standalone question that includes the necessary context. If it's already a complete, standalone question unrelated to the prior conversation, return it exactly as-is.
+
+Return ONLY the rewritten question, nothing else."""
+
+    try:
+        response, _ = _call_llm(rewrite_prompt, max_tokens=150, temperature=0.1)
+        if response:
+            cleaned = response.strip().strip('"').strip("'").strip()
+            if cleaned and len(cleaned) >= 2:
+                logger.info(f"[QueryRewrite] Original: '{raw_query}' -> Rewritten: '{cleaned}'")
+                return cleaned
+    except Exception as e:
+        logger.warning(f"[QueryRewrite] Contextual rewrite failed: {e}. Using original query.")
+
+    return raw_query
+
+
+def generate_conversation_summary(
+    messages: List[Any],
+    existing_summary: Optional[str] = None
+) -> Optional[str]:
+    """
+    Generates a 2-3 sentence running summary of conversation turns that fall outside the sliding window.
+    """
+    if not messages:
+        return existing_summary
+
+    history_lines = []
+    if existing_summary:
+        history_lines.append(f"Previous summary: {existing_summary}")
+
+    for m in messages:
+        role = getattr(m, 'role', m.get('role') if isinstance(m, dict) else 'User')
+        role_label = 'User' if role == 'user' else 'Assistant'
+        content = getattr(m, 'content', m.get('content') if isinstance(m, dict) else '')
+        if content:
+            history_lines.append(f"{role_label}: {content}")
+
+    conv_text = "\n".join(history_lines)
+    prompt = (
+        "Summarize this conversation so far in 2-3 concise sentences, preserving key facts, entities, and topics discussed:\n\n"
+        f"{conv_text}\n\n"
+        "Summary:"
     )
 
+    try:
+        res, _ = _call_llm(prompt, max_tokens=250, temperature=0.2)
+        if res:
+            logger.info(f"[ConversationSummary] Generated new running summary: {res.strip()[:100]}...")
+            return res.strip()
+    except Exception as e:
+        logger.warning(f"[ConversationSummary] Summary generation failed: {e}")
 
-def _build_general_prompt(query: str, question_type: str = "EXPLANATION") -> str:
+    return existing_summary
+
+
+def _build_rag_prompt(
+    query: str,
+    context_str: str,
+    question_type: str = "EXPLANATION",
+    history_text: str = "",
+    running_summary: str = ""
+) -> str:
     type_instruction = _TYPE_INSTRUCTIONS.get(question_type, _TYPE_INSTRUCTIONS["EXPLANATION"])
+    summary_block = f"SUMMARY OF PREVIOUS CONVERSATION:\n{running_summary}\n\n" if running_summary else ""
+    history_block = f"CONVERSATION HISTORY (for context only):\n{history_text}\n\n" if history_text else ""
+
     return (
-        "You are Knowledge AI, an expert assistant.\n"
-        f"Answer this question clearly and accurately: {query}\n\n"
+        "SYSTEM: You are Knowledge AI, an expert research assistant. Answer using ONLY the retrieved document excerpts below as your source of truth. "
+        "Use the conversation history only to understand what the user is referring to (such as 'that', 'it', 'the second point', etc.), not as a source of factual information.\n\n"
+        f"{summary_block}"
+        f"{history_block}"
+        f"DOCUMENT EXCERPTS (your actual source of truth):\n{context_str}\n\n"
+        f"CURRENT QUESTION:\n{query}\n\n"
         f"{type_instruction}\n\n"
         f"{_STANDARD_FORMATTING_RULES}"
     )
 
 
+def _build_general_prompt(
+    query: str,
+    question_type: str = "EXPLANATION",
+    history_text: str = "",
+    running_summary: str = ""
+) -> str:
+    type_instruction = _TYPE_INSTRUCTIONS.get(question_type, _TYPE_INSTRUCTIONS["EXPLANATION"])
+    summary_block = f"SUMMARY OF PREVIOUS CONVERSATION:\n{running_summary}\n\n" if running_summary else ""
+    history_block = f"CONVERSATION HISTORY (for context only):\n{history_text}\n\n" if history_text else ""
+
+    return (
+        "SYSTEM: You are Knowledge AI, an expert assistant.\n\n"
+        f"{summary_block}"
+        f"{history_block}"
+        f"CURRENT QUESTION:\n{query}\n\n"
+        f"{type_instruction}\n\n"
+        f"{_STANDARD_FORMATTING_RULES}"
+    )
+
+
+def _call_groq(prompt: str, max_tokens: int = 1500, temperature: float = 0.2) -> Optional[str]:
+    """Calls Groq API using Groq SDK or httpx fallback."""
+    if _provider_state["groq"]["status"] == "not_configured":
+        validate_providers_at_startup()
+
+    api_key = (settings.GROQ_API_KEY or "").strip()
+    if not api_key:
+        return None
+
+    timeout_sec = _get_timeout()
+    model_candidates = [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "mixtral-8x7b-32768",
+    ]
+
+    # 1. Try official Groq SDK
+    groq_client = _get_groq_client()
+    if groq_client:
+        for model_name in model_candidates:
+            try:
+                chat_completion = groq_client.chat.completions.create(
+                    messages=[{"role": "user", "content": prompt}],
+                    model=model_name,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout_sec,
+                )
+                if chat_completion and chat_completion.choices:
+                    ans = chat_completion.choices[0].message.content
+                    if ans:
+                        logger.info(f"[LLM] Groq SDK model '{model_name}' responded ({len(ans)} chars)")
+                        return ans.strip()
+            except Exception as ge:
+                logger.warning(f"[Groq SDK Failed] Model: '{model_name}': {ge}")
+
+    # 2. Fallback to direct HTTP with httpx
+    try:
+        import httpx
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        for model_name in model_candidates:
+            try:
+                payload = {
+                    "model": model_name,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": temperature,
+                    "max_tokens": max_tokens
+                }
+                res = httpx.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=timeout_sec
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    choices = data.get("choices", [])
+                    if choices:
+                        ans = choices[0].get("message", {}).get("content", "")
+                        if ans:
+                            logger.info(f"[LLM] Groq HTTP model '{model_name}' responded ({len(ans)} chars)")
+                            return ans.strip()
+                else:
+                    logger.warning(f"[Groq HTTP Failed] Model: '{model_name}' status={res.status_code}: {res.text[:200]}")
+            except Exception as he:
+                logger.warning(f"[Groq HTTP Exception] Model: '{model_name}': {he}")
+    except Exception as ie:
+        logger.error(f"[Groq] HTTP fallback unavailable: {ie}")
+
+    logger.error("[LLM] All Groq candidate models failed.")
+    return None
+
+
 def _call_gemini(prompt: str) -> Optional[str]:
+    if _provider_state["gemini"]["status"] == "not_configured":
+        validate_providers_at_startup()
+
     if not _provider_state["gemini"]["enabled"]:
         return None
 
@@ -535,11 +784,10 @@ def _call_gemini(prompt: str) -> Optional[str]:
     genai.configure(api_key=api_key)
 
     model_candidates = [
-        "gemini-2.5-flash",
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-flash",
-        "gemini-2.0-flash",
-        "gemini-1.5-pro-latest",
+        "gemini-3.7-flash",
+        "gemini-flash-latest",
+        "gemini-3.5-flash",
+        "gemini-3.1-flash-lite",
     ]
 
     max_retries_per_model = 2
@@ -567,24 +815,55 @@ def _call_gemini(prompt: str) -> Optional[str]:
                 )
 
                 is_rate_limit = any(x in err_lower for x in ["429", "quota", "resourceexhausted", "rate limit", "too many requests"])
-                is_auth_error = any(x in err_lower for x in ["api_key", "invalid", "403", "401", "unauthenticated", "permission"])
-
-                if is_auth_error:
-                    logger.error(f"[Gemini Auth Error] API key invalid: {err_msg}")
-                    return None
+                is_auth_error = not is_rate_limit and any(x in err_lower for x in ["api_key invalid", "invalid api_key", "api key invalid", "invalid api key", "unauthenticated", "permission_denied", "forbidden"])
 
                 if is_rate_limit:
                     if attempt < max_retries_per_model:
-                        backoff = 1.5 * (attempt + 1)
+                        backoff = 2.0 * (attempt + 1)
                         logger.info(f"[Gemini 429 Retry] Rate limit hit on '{model_name}'. Retrying in {backoff:.1f}s...")
                         time.sleep(backoff)
                         continue
                     else:
                         break
+
+                if is_auth_error:
+                    logger.error(f"[Gemini Auth Error] API key invalid: {err_msg}")
+                    return None
                 break
 
     logger.error("[LLM] All Gemini candidate models failed.")
     return None
+
+
+def _call_llm(prompt: str, max_tokens: int = 1500, temperature: float = 0.2) -> Tuple[Optional[str], str]:
+    """
+    Unified LLM router:
+    Checks configured provider order (Groq primary, Gemini paused/fallback).
+    Returns (answer_text, provider_name).
+    """
+    provider_pref = (settings.LLM_PROVIDER or "groq").lower()
+
+    if provider_pref == "groq" or _provider_state["groq"]["enabled"]:
+        res = _call_groq(prompt, max_tokens=max_tokens, temperature=temperature)
+        if res:
+            return res, "groq"
+        if _provider_state["gemini"]["enabled"]:
+            logger.warning("[LLM] Groq failed, attempting fallback to Gemini...")
+            gem_res = _call_gemini(prompt)
+            if gem_res:
+                return gem_res, "gemini"
+
+    elif provider_pref == "gemini" or _provider_state["gemini"]["enabled"]:
+        res = _call_gemini(prompt)
+        if res:
+            return res, "gemini"
+        if _provider_state["groq"]["enabled"]:
+            logger.warning("[LLM] Gemini failed, attempting fallback to Groq...")
+            gr_res = _call_groq(prompt, max_tokens=max_tokens, temperature=temperature)
+            if gr_res:
+                return gr_res, "groq"
+
+    return None, "fallback"
 
 
 def generate_answer(
@@ -592,11 +871,30 @@ def generate_answer(
     retrieved_chunks: List[Dict[str, Any]],
     zero_chunk_mode: bool = False,
     question_type: str = "EXPLANATION",
+    conversation_history: Optional[List[Any]] = None,
+    running_summary: Optional[str] = None,
 ) -> Dict[str, Any]:
     t0 = time.time()
 
+    # Format recent conversation turns (up to last 8 messages = 4 turns)
+    history_lines = []
+    if conversation_history:
+        for m in conversation_history[-8:]:
+            role = getattr(m, 'role', m.get('role') if isinstance(m, dict) else 'User')
+            role_label = 'User' if role == 'user' else 'Assistant'
+            content = getattr(m, 'content', m.get('content') if isinstance(m, dict) else '')
+            if content:
+                history_lines.append(f"{role_label}: {content}")
+    history_text = "\n".join(history_lines)
+    summary_text = (running_summary or "").strip()
+
     if zero_chunk_mode or not retrieved_chunks:
-        prompt = _build_general_prompt(query, question_type=question_type)
+        prompt = _build_general_prompt(
+            query,
+            question_type=question_type,
+            history_text=history_text,
+            running_summary=summary_text,
+        )
     else:
         top_chunks = retrieved_chunks[:50] if any(c.get("is_workflow_expanded") for c in retrieved_chunks) else retrieved_chunks[:8]
         context_blocks = []
@@ -617,23 +915,29 @@ def generate_answer(
             total_context_chars += len(cleaned_text)
 
         context_str = "\n\n".join(context_blocks)
-        prompt = _build_rag_prompt(query, context_str, question_type=question_type)
+        prompt = _build_rag_prompt(
+            query,
+            context_str,
+            question_type=question_type,
+            history_text=history_text,
+            running_summary=summary_text,
+        )
 
     try:
-        result = _call_gemini(prompt)
+        result, active_provider = _call_llm(prompt, max_tokens=1500, temperature=0.2)
         if result:
             elapsed = time.time() - t0
-            logger.info(f"[LLM] Gemini answered in {elapsed:.2f}s (query: '{query[:50]}', type: {question_type})")
+            logger.info(f"[LLM] {active_provider.upper()} answered in {elapsed:.2f}s (query: '{query[:50]}', type: {question_type})")
             clean_answer = sanitize_answer_text(result)
             speech_text = build_speech_text(clean_answer)
             return {
                 "answer": clean_answer,
                 "speech_text": speech_text,
-                "provider": "gemini",
+                "provider": active_provider,
                 "degraded": False,
             }
     except Exception as e:
-        logger.error(f"[LLM] Gemini call failed: {e}", exc_info=True)
+        logger.error(f"[LLM] Call failed: {e}", exc_info=True)
 
     elapsed = time.time() - t0
     logger.warning(f"[LLM] Returning structured fallback after {elapsed:.2f}s (query: '{query[:50]}')")

@@ -12,6 +12,7 @@ from app.models.citation import Citation
 from app.schemas.chat import ConversationResponse, MessageResponse, CitationResponse, CreateMessageRequest
 from app.core.deps import get_current_user
 from app.services.chat_service import generate_rag_response
+from app.services.llm_provider import generate_conversation_summary
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,8 @@ def list_conversations(
                     createdAt=created_str,
                     updatedAt=updated_str,
                     model=conv.model,
-                    pinned=conv.pinned or False
+                    pinned=conv.pinned or False,
+                    running_summary=getattr(conv, 'running_summary', None),
                 )
             )
         except Exception as e:
@@ -118,7 +120,8 @@ def create_conversation(
         ],
         documentIds=[],
         createdAt=format_iso_utc(conv.created_at),
-        updatedAt=format_iso_utc(conv.updated_at)
+        updatedAt=format_iso_utc(conv.updated_at),
+        running_summary=None,
     )
 
 @router.get("/{conversation_id}", response_model=ConversationResponse)
@@ -155,7 +158,8 @@ def get_conversation(
         messages=msg_responses,
         documentIds=conv.document_ids or [],
         createdAt=format_iso_utc(conv.created_at),
-        updatedAt=format_iso_utc(conv.updated_at)
+        updatedAt=format_iso_utc(conv.updated_at),
+        running_summary=getattr(conv, 'running_summary', None),
     )
 
 @router.delete("/{conversation_id}")
@@ -183,6 +187,37 @@ def post_message(
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
+    # 1. Fetch recent messages BEFORE adding new user message (last 8 messages = ~4 conversational turns)
+    recent_messages = (
+        db.query(Message)
+        .filter(Message.conversation_id == conv.id)
+        .order_by(Message.created_at.desc())
+        .limit(8)
+        .all()
+    )
+    recent_messages.reverse()  # chronological order for prompt & rewrite
+
+    # 2. Manage context window size for long conversations (> 8 messages)
+    total_messages_count = db.query(Message).filter(Message.conversation_id == conv.id).count()
+    if total_messages_count > 8 and (total_messages_count % 10 == 0 or not conv.running_summary):
+        try:
+            all_prior_msgs = (
+                db.query(Message)
+                .filter(Message.conversation_id == conv.id)
+                .order_by(Message.created_at.asc())
+                .all()
+            )
+            # Summarize turns before the sliding window (all messages except the last 8)
+            msgs_to_summarize = all_prior_msgs[:-8] if len(all_prior_msgs) > 8 else all_prior_msgs
+            if msgs_to_summarize:
+                new_summary = generate_conversation_summary(msgs_to_summarize, conv.running_summary)
+                if new_summary:
+                    conv.running_summary = new_summary
+                    db.flush()
+        except Exception as sum_err:
+            logger.warning(f"Failed to generate running summary: {sum_err}")
+
+    # 3. Add and persist user message
     user_content = req.get_content()
     user_msg_id = str(uuid.uuid4())
     user_msg = Message(
@@ -197,13 +232,16 @@ def post_message(
     if conv.title == "New Research Session" or conv.title == "New Conversation":
         conv.title = user_content[:40] + "..." if len(user_content) > 40 else user_content
 
+    # 4. Generate RAG response with conversation history & running summary
     try:
         answer_text, citations_list, rag_metadata = generate_rag_response(
             db=db,
             user_id=current_user.id,
             conversation_id=conv.id,
             user_query=user_content,
-            context_document_ids=req.context_document_ids
+            context_document_ids=req.context_document_ids,
+            conversation_history=recent_messages,
+            running_summary=getattr(conv, 'running_summary', None),
         )
     except Exception as ge:
         logger.error(f"Error generating RAG response: {ge}")
