@@ -209,8 +209,17 @@ def delete_document(
     db: Session = Depends(get_db)
 ):
     doc = db.query(Document).filter(Document.id == document_id).first()
-    if not doc or doc.uploaded_by != current_user.id:
+    if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    if doc.uploaded_by != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized to delete this document")
+
+    # Clean up physical file on disk
+    if doc.file_path and os.path.exists(doc.file_path):
+        try:
+            os.remove(doc.file_path)
+        except Exception as fe:
+            logger.warning(f"File removal notice for document {document_id}: {fe}")
 
     # Clean up vector embeddings from Qdrant
     try:

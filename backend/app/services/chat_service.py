@@ -44,6 +44,12 @@ _SUMMARY_PATTERNS = [
 ]
 
 
+_DETAIL_INTENT_PATTERNS = [
+    re.compile(r'\b(?:in details?|in-depth|more details?|give (?:me )?(?:more|details?|in details?)|explain in detail|elaborate|expand|comprehensive)\b', re.IGNORECASE),
+    re.compile(r'\b(?:tell me more|expand on|deep dive|further details?)\b', re.IGNORECASE),
+]
+
+
 def classify_question_type(query: str) -> str:
     """
     Classifies the user's question into one of six categories:
@@ -56,6 +62,10 @@ def classify_question_type(query: str) -> str:
     """
     q = (query or "").strip().lower()
     if not q:
+        return "EXPLANATION"
+
+    # Detail expansion intent always maps to EXPLANATION
+    if any(p.search(q) for p in _DETAIL_INTENT_PATTERNS):
         return "EXPLANATION"
 
     # Fast heuristic check in priority order
@@ -159,7 +169,11 @@ def _generate_rag_response_core(
         logger.info(f"[RAG] Using standalone query: '{user_query}'")
 
     # ── STAGE 0B: QUESTION TYPE CLASSIFICATION ─────────────────────
-    question_type = classify_question_type(retrieval_query)
+    # Check detail-intent override from either user query or rewritten query
+    if any(p.search(user_query) for p in _DETAIL_INTENT_PATTERNS) or any(p.search(retrieval_query) for p in _DETAIL_INTENT_PATTERNS):
+        question_type = "EXPLANATION"
+    else:
+        question_type = classify_question_type(retrieval_query)
     logger.info(f"[RAG Timing] Question Type for query '{retrieval_query[:50]}': {question_type}")
 
     # ── STAGE 1: VECTOR RETRIEVAL ──────────────────────────────────

@@ -1,3 +1,5 @@
+import os
+import logging
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -10,7 +12,6 @@ from app.schemas.admin import AdminOverviewResponse, AdminSystemMonitoring, Admi
 from app.core.deps import require_admin
 from app.services.admin_service import get_admin_overview_data, get_system_monitoring_data
 
-import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["Admin"], dependencies=[Depends(require_admin)])
@@ -185,6 +186,13 @@ def admin_delete_dataset(dataset_id: str, db: Session = Depends(get_db)):
     doc = db.query(Document).filter(Document.id == dataset_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Dataset not found")
+
+    # Clean up physical file on disk
+    if doc.file_path and os.path.exists(doc.file_path):
+        try:
+            os.remove(doc.file_path)
+        except Exception as fe:
+            logger.warning(f"File removal notice for dataset {dataset_id}: {fe}")
 
     # Clean up vector embeddings from Qdrant
     try:

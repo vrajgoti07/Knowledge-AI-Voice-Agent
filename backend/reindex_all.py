@@ -84,7 +84,44 @@ def main():
 
     db = SessionLocal()
     try:
-        # ── 1. Select target documents ────────────────────────────────────────
+        # ── 1. Auto-discover any PDF files in uploads/ not yet in DB ────────────
+        uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "uploads"))
+        if os.path.exists(uploads_dir):
+            for fname in os.listdir(uploads_dir):
+                if fname.lower().endswith((".pdf", ".docx", ".pptx", ".txt")):
+                    fpath = os.path.join(uploads_dir, fname)
+                    # Extract original title from "docId_title" or use filename
+                    if "_" in fname and len(fname.split("_")[0]) >= 10:
+                        doc_id_part = fname.split("_")[0]
+                        orig_title = "_".join(fname.split("_")[1:])
+                    else:
+                        doc_id_part = None
+                        orig_title = fname
+
+                    existing = None
+                    if doc_id_part:
+                        existing = db.query(Document).filter(Document.id == doc_id_part).first()
+                    if not existing:
+                        existing = db.query(Document).filter(Document.title == orig_title).first()
+
+                    if not existing:
+                        import uuid
+                        new_id = doc_id_part or str(uuid.uuid4())
+                        new_doc = Document(
+                            id=new_id,
+                            title=orig_title,
+                            file_type=orig_title.split(".")[-1].upper() if "." in orig_title else "PDF",
+                            file_size=os.path.getsize(fpath),
+                            file_path=fpath,
+                            status="ready",
+                            is_knowledge_base=True,
+                            uploaded_by="admin",
+                        )
+                        db.add(new_doc)
+                        db.commit()
+                        logger.info(f"Auto-registered document in DB from uploads: '{orig_title}' (id={new_id})")
+
+        # ── 2. Select target documents ────────────────────────────────────────
         if args.mode == "all":
             docs = db.query(Document).filter(
                 Document.status.in_(["ready", "error"])

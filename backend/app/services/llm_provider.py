@@ -499,11 +499,44 @@ def classify_question_llm(query: str) -> Optional[str]:
     return None
 
 
+_SHALLOW_META_PATTERNS = [
+    re.compile(r'\bis defined formally and intuitively\b', re.IGNORECASE),
+    re.compile(r'\bis defined and explained\b', re.IGNORECASE),
+    re.compile(r'\bis discussed in (?:detail|the source|chapter|section|the text)\b', re.IGNORECASE),
+    re.compile(r'\bis covered in (?:chapter|module|section|detail)\b', re.IGNORECASE),
+    re.compile(r'\bis explained in (?:chapter|module|section|detail)\b', re.IGNORECASE),
+]
+
+
+def is_shallow_or_meta_answer(answer: str, query: str) -> bool:
+    """
+    Detects if an answer is suspiciously short, circular, or merely references
+    that a definition/discussion exists without stating it.
+    """
+    if not answer or not answer.strip():
+        return True
+
+    clean = answer.strip()
+    words = clean.split()
+
+    if len(words) < 55:
+        if any(pat.search(clean) for pat in _SHALLOW_META_PATTERNS):
+            return True
+        if re.search(r'\bis defined (?:as|in|formally)\b', clean, re.IGNORECASE) and len(words) < 35:
+            return True
+
+    return False
+
+
 _TYPE_INSTRUCTIONS: Dict[str, str] = {
     "DEFINITION": (
         "QUESTION TYPE: DEFINITION ('what is X', 'define X')\n"
-        "INSTRUCTION: Answer in 2-4 concise, direct sentences. Do NOT provide a full topic overview unless explicitly requested. "
-        "Do NOT use markdown headers (##). Strict maximum length: 80 words."
+        "INSTRUCTION: Provide a complete, clear, and substantive definition in 3-5 sentences (roughly 80-140 words). "
+        "The answer must actually STATE the definition using the retrieved source content, not merely reference that a definition exists. "
+        "Never write phrases like 'is defined as' or 'is explained in the source' without immediately including the actual definition content that follows. "
+        "Do not produce meta-referential answers (e.g. 'X is discussed in [source]' or 'X is defined formally and intuitively [source]') without including the actual content of that discussion or definition in the same response. "
+        "If the retrieved context does not contain enough substantive content to form a real definition, say so explicitly rather than producing a vague or circular answer. "
+        "Do NOT use markdown headers (##)."
     ),
     "EXPLANATION": (
         "QUESTION TYPE: EXPLANATION ('explain X', 'how does X work', 'why does X happen')\n"
@@ -926,6 +959,25 @@ def generate_answer(
     try:
         result, active_provider = _call_llm(prompt, max_tokens=1500, temperature=0.2)
         if result:
+            # Quality check: check if answer is shallow/meta-referential
+            if is_shallow_or_meta_answer(result, query):
+                logger.warning(
+                    f"[QualityCheck] Shallow/meta answer detected ({len(result.split())} words) for query='{query[:50]}'. "
+                    f"Retrying with corrective instruction..."
+                )
+                retry_prompt = (
+                    f"{prompt}\n\n"
+                    "CRITICAL CORRECTION REQUIRED:\n"
+                    "Your previous response was too vague, shallow, or only referenced that a definition/topic exists without stating it. "
+                    "You MUST state the actual, complete, and substantive definition and explanation directly from the document excerpts above. "
+                    "Do NOT produce meta-references (e.g. do not say 'it is defined in Chapter X' or 'it is defined formally and intuitively'). "
+                    "State the full definition immediately in 3-5 complete sentences."
+                )
+                retry_result, retry_prov = _call_llm(retry_prompt, max_tokens=1500, temperature=0.2)
+                if retry_result and len(retry_result.split()) >= len(result.split()):
+                    result = retry_result
+                    active_provider = retry_prov
+
             elapsed = time.time() - t0
             logger.info(f"[LLM] {active_provider.upper()} answered in {elapsed:.2f}s (query: '{query[:50]}', type: {question_type})")
             clean_answer = sanitize_answer_text(result)

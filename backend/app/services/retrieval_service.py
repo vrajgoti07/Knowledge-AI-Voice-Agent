@@ -17,16 +17,18 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
-from app.services.embedding_service import generate_embeddings, EMBEDDING_MODEL_NAME
+from app.services.embedding_service import generate_embeddings, EMBEDDING_MODEL_NAME, is_low_information_chunk
 from app.core.qdrant_client import search_qdrant_chunks, fetch_parent_section_chunks_qdrant
 
 logger = logging.getLogger("knowledge_ai.retrieval")
 
 # ── Tunable thresholds ────────────────────────────────────────────────────────
 RERANK_MIN_SCORE: float = 0.35
-QDRANT_CANDIDATE_K: int = 20
+RERANK_MIN_SCORE_BM25_ONLY: float = 0.28  # Lower threshold when Qdrant is offline
+QDRANT_CANDIDATE_K: int = 30  # Increased from 20 for better cross-PDF coverage
 FINAL_TOP_K: int = 8
 MAX_CHUNKS_PER_DOC: int = 3
+MIN_DOCS_IN_RESULT: int = 2  # Try to include at least 2 different PDFs
 DEBUG_LOG_TOP_N: int = 10
 
 
@@ -66,6 +68,54 @@ _ACRONYM_MAP: Dict[str, str] = {
     "rl":  "reinforcement learning",
     "llm": "large language model",
     "rag": "retrieval augmented generation",
+    "svm": "support vector machine",
+    "knn": "k nearest neighbors",
+    "pca": "principal component analysis",
+    "eda": "exploratory data analysis",
+    "cnn": "convolutional neural network",
+    "rnn": "recurrent neural network",
+    "gd":  "gradient descent",
+    "sgd": "stochastic gradient descent",
+    "mse": "mean squared error",
+    "mae": "mean absolute error",
+    "lr":  "logistic regression",
+    "dt":  "decision tree",
+    "rf":  "random forest",
+}
+
+# ── Semantic Concept Synonyms ────────────────────────────────────────────────
+# Maps common query terms to related concepts found in ML textbooks.
+# This helps BM25 find chunks when the user uses different terminology.
+_CONCEPT_SYNONYMS: Dict[str, List[str]] = {
+    "overfitting":       ["overfit", "memorizing", "variance", "regularization", "generalization"],
+    "underfitting":      ["underfit", "bias", "high bias", "poor fit"],
+    "regularization":    ["l1", "l2", "lasso", "ridge", "penalty", "overfitting"],
+    "supervised":        ["classification", "regression", "labeled", "labels", "training data"],
+    "unsupervised":      ["clustering", "dimensionality reduction", "unlabeled"],
+    "classification":    ["classifier", "classify", "class label", "categorical", "supervised"],
+    "regression":        ["predict", "continuous", "linear regression", "supervised"],
+    "clustering":        ["cluster", "k-means", "hierarchical", "unsupervised", "grouping"],
+    "preprocessing":     ["data cleaning", "normalization", "standardization", "missing values", "feature scaling"],
+    "feature":           ["attribute", "variable", "column", "predictor", "input"],
+    "training":          ["train", "fit", "learning", "model training"],
+    "testing":           ["test", "evaluation", "validation", "test set"],
+    "accuracy":          ["precision", "recall", "f1", "performance", "metrics"],
+    "gradient descent":  ["optimization", "learning rate", "convergence", "gradient"],
+    "decision tree":     ["tree", "splitting", "entropy", "gini", "information gain"],
+    "neural network":    ["neuron", "layer", "activation", "backpropagation", "deep learning"],
+    "cross validation":  ["k-fold", "validation", "holdout", "train test split"],
+    "bias":              ["underfitting", "systematic error"],
+    "variance":          ["overfitting", "model complexity"],
+    "ensemble":          ["bagging", "boosting", "random forest", "voting", "stacking"],
+    "naive bayes":       ["bayes theorem", "probability", "conditional", "prior"],
+    "svm":               ["support vector", "hyperplane", "kernel", "margin"],
+    "knn":               ["nearest neighbor", "distance", "euclidean", "similarity"],
+    "linear regression": ["least squares", "slope", "intercept", "ordinary least squares"],
+    "logistic regression":["sigmoid", "binary classification", "log odds", "probability"],
+    "normalization":     ["min-max", "scaling", "feature scaling", "standardization"],
+    "standardization":   ["z-score", "mean", "standard deviation", "normalization"],
+    "missing values":    ["imputation", "null", "nan", "missing data", "preprocessing"],
+    "outlier":           ["anomaly", "outliers", "detection", "iqr", "z-score"],
 }
 
 _cross_encoder = None
@@ -218,29 +268,55 @@ def apply_diversity_cap(
     chunks: List[Dict[str, Any]],
     max_per_doc: int = MAX_CHUNKS_PER_DOC,
     top_k: int = FINAL_TOP_K,
+    min_docs: int = MIN_DOCS_IN_RESULT,
 ) -> List[Dict[str, Any]]:
     """
     Applies per-document diversity cap: selects top candidate chunks such that
     no single document contributes more than `max_per_doc` chunks (default 3) to top_k (default 8).
+    Also ensures we pull from at least `min_docs` different PDFs when available.
     """
     if not chunks:
         return []
 
+    # Count unique documents available
+    available_doc_ids = set(c.get("document_id") or "unknown" for c in chunks)
+    num_available_docs = len(available_doc_ids)
+
+    # If we have enough docs, adaptively lower max_per_doc to ensure diversity
+    effective_max = max_per_doc
+    if num_available_docs >= min_docs and top_k >= min_docs * 2:
+        # e.g., if 4 PDFs available and top_k=8, allow at most 3 per doc
+        effective_max = min(max_per_doc, max(2, top_k // min(num_available_docs, 4)))
+
     doc_counts: Dict[str, int] = {}
     selected: List[Dict[str, Any]] = []
 
+    # First pass: pick top chunks respecting per-doc cap
     for chunk in chunks:
         doc_id = chunk.get("document_id") or "unknown"
         current_count = doc_counts.get(doc_id, 0)
-        if current_count < max_per_doc:
+        if current_count < effective_max:
             selected.append(chunk)
             doc_counts[doc_id] = current_count + 1
             if len(selected) >= top_k:
                 break
 
+    # Second pass: if we only got chunks from 1 doc but more docs are available,
+    # force-include top chunk from other docs for cross-PDF coverage
+    if len(doc_counts) < min(min_docs, num_available_docs) and len(selected) < top_k:
+        included_docs = set(doc_counts.keys())
+        for chunk in chunks:
+            doc_id = chunk.get("document_id") or "unknown"
+            if doc_id not in included_docs:
+                selected.append(chunk)
+                doc_counts[doc_id] = 1
+                included_docs.add(doc_id)
+                if len(selected) >= top_k or len(included_docs) >= min_docs:
+                    break
+
     logger.info(
         f"[DiversityCap] Selected {len(selected)} chunks across {len(doc_counts)} documents "
-        f"(max {max_per_doc} per doc, target top_k={top_k})"
+        f"(max {effective_max} per doc, target top_k={top_k}, available_docs={num_available_docs})"
     )
     return selected
 
@@ -255,9 +331,17 @@ def rerank_chunks(
     if not candidates:
         return []
 
+    # 1. Filter out low-information meta/TOC candidates before reranking
+    valid_candidates = [
+        c for c in candidates
+        if not is_low_information_chunk(c.get("content", ""), c.get("page", 1))
+    ]
+    if not valid_candidates:
+        valid_candidates = candidates  # Fallback to candidates if all were filtered
+
     cross_enc = get_cross_encoder()
     if cross_enc is None:
-        filtered = [c for c in candidates if c.get("score", 0) >= min_score]
+        filtered = [c for c in valid_candidates if c.get("score", 0) >= min_score]
         return apply_diversity_cap(filtered, max_per_doc=max_per_doc, top_k=top_k)
 
     try:
@@ -266,16 +350,45 @@ def rerank_chunks(
             x = max(-500.0, min(500.0, float(x)))
             return 1.0 / (1.0 + math.exp(-x))
 
-        pairs = [(query, c.get("content", "")) for c in candidates]
+        q_lower = query.lower()
+        q_words = re.findall(r'\b[a-zA-Z0-9_\-\.]+\b', q_lower)
+        expansions = []
+        for w in q_words:
+            if w in _ACRONYM_MAP:
+                expansions.append(_ACRONYM_MAP[w])
+        expanded_query = f"{query} {' '.join(expansions)}".strip() if expansions else query
+
+        pairs = []
+        for c in valid_candidates:
+            doc_t = c.get("document_title") or ""
+            sec_t = c.get("section_title") or ""
+            sec_n = c.get("section_number") or ""
+            hdr = f"[{doc_t} — {sec_n} {sec_t}]\n" if (sec_t or doc_t) else ""
+            pairs.append((expanded_query, f"{hdr}{c.get('content', '')}"))
+
         raw_scores = cross_enc.predict(pairs)
 
         scored = []
-        for c, raw in zip(candidates, raw_scores):
+        for c, raw in zip(valid_candidates, raw_scores):
             raw_f = float(raw)
             norm_score = sigmoid(raw_f)
+
+            # Substance-aware scoring:
+            # Rich, complete paragraphs (60-350 words) receive a boost.
+            # Short fragments (<35 words) receive a penalty to avoid ranking above real definitions.
+            content = c.get("content", "")
+            words_count = len(content.split())
+            substance_multiplier = 1.0
+            if words_count >= 60:
+                substance_multiplier = 1.06  # 6% boost for complete, rich paragraphs
+            elif words_count < 35:
+                substance_multiplier = 0.82  # 18% penalty for fragmentary snippets
+
+            final_score = round(min(1.0, norm_score * substance_multiplier), 4)
+
             scored.append({
                 **c,
-                "rerank_score": round(norm_score, 4),
+                "rerank_score": final_score,
                 "_raw_rerank_score": round(raw_f, 4),
             })
 
@@ -288,6 +401,7 @@ def rerank_chunks(
         for i, s in enumerate(scored[:DEBUG_LOG_TOP_N], 1):
             logger.info(
                 f"  [{i:02d}] rerank_norm={s['rerank_score']:.4f} | "
+                f"words={len(s.get('content', '').split()):>3} | "
                 f"sec='{s.get('section_number', 'N/A')}' | "
                 f"cosine={s.get('score', 0):.4f} | "
                 f"page={s.get('page', '?'):>4} | "
@@ -307,14 +421,15 @@ def rerank_chunks(
 
     except Exception as e:
         logger.error(f"[Rerank] Prediction failed: {e}. Falling back to cosine.")
-        filtered = [c for c in candidates if c.get("score", 0) >= min_score]
+        filtered = [c for c in valid_candidates if c.get("score", 0) >= min_score]
         return apply_diversity_cap(filtered, max_per_doc=max_per_doc, top_k=top_k)
-
 
 
 def is_boilerplate_text(content: str, page_number: int) -> bool:
     if not content:
         return False
+    if is_low_information_chunk(content, page_number):
+        return True
     t_lower = content.lower()
     legal_terms = [
         "isbn", "copyright", "all rights reserved", "printed in",
@@ -329,28 +444,53 @@ def is_boilerplate_text(content: str, page_number: int) -> bool:
     return False
 
 
+def _expand_query_with_synonyms(query: str) -> str:
+    """
+    Expands a query with semantically related terms from _CONCEPT_SYNONYMS.
+    e.g. 'explain overfitting' → 'explain overfitting overfit memorizing variance regularization generalization'
+    """
+    q_lower = query.lower()
+    q_words = set(re.findall(r'\b[a-zA-Z_]+\b', q_lower))
+    expansions = []
+
+    for concept, synonyms in _CONCEPT_SYNONYMS.items():
+        concept_words = set(concept.split())
+        # Check if concept appears as substring or as individual words
+        if concept in q_lower or concept_words.intersection(q_words):
+            for syn in synonyms:
+                if syn not in q_lower:
+                    expansions.append(syn)
+
+    if expansions:
+        # Limit to top 8 expansion terms to avoid query dilution
+        expansion_str = " ".join(expansions[:8])
+        logger.info(f"[BM25] Synonym expansion: '{query[:50]}' + [{expansion_str[:80]}]")
+        return f"{query} {expansion_str}"
+    return query
+
+
 def _bm25_search(
     db: Session,
     user_id: str,
     query: str,
     top_k: int = QDRANT_CANDIDATE_K,
-    context_document_ids: Optional[List[str]] = None
+    context_document_ids: List[str] = None
 ) -> List[Dict[str, Any]]:
-    """BM25Okapi keyword search over document chunks in DB."""
+    """
+    In-memory BM25 keyword search across all user document chunks.
+    Builds an in-memory index from chunks in SQLite for the user's ready documents.
+    Includes synonym expansion for better recall when Qdrant is offline.
+    """
     try:
         from rank_bm25 import BM25Okapi
-    except ImportError:
-        logger.warning("[BM25] rank_bm25 not installed, skipping BM25 keyword search.")
-        return []
-
-    try:
-        query_builder = db.query(Document).filter(
-            (Document.uploaded_by == user_id) | (Document.is_knowledge_base == True)
+        q_user = db.query(Document).filter(
+            (Document.uploaded_by == user_id) | (Document.is_knowledge_base == True),
+            Document.status == "ready"
         )
         if context_document_ids:
-            query_builder = query_builder.filter(Document.id.in_(context_document_ids))
+            q_user = q_user.filter(Document.id.in_(context_document_ids))
+        user_docs = q_user.all()
 
-        user_docs = query_builder.all()
         if not user_docs:
             return []
 
@@ -372,10 +512,25 @@ def _bm25_search(
                     tokens.extend(_ACRONYM_MAP[w].split())
             return tokens
 
-        tokenized_corpus = [tokenize(c.content) for c in chunks]
-        tokenized_query = tokenize(query)
+        tokenized_corpus = []
+        for c in chunks:
+            d = doc_map.get(c.document_id)
+            doc_t = d.title if d else ""
+            sec_t = c.section_title or ""
+            sec_n = c.section_number or ""
+            full_searchable = f"{doc_t} {sec_n} {sec_t} {c.content}"
+            tokenized_corpus.append(tokenize(full_searchable))
+
+        # Expand query with semantic synonyms for better recall
+        expanded_query = _expand_query_with_synonyms(query)
+
+        tokenized_query = tokenize(expanded_query)
         if not tokenized_query:
             tokenized_query = [w.lower() for w in query.split()]
+
+        # For definition queries, ensure definition terms help elevate definition chunks
+        if re.search(r'\b(?:what\s+is|what\s+are|define|definition|meaning)\b', query.lower()):
+            tokenized_query.extend(["definition", "defined", "meaning"])
 
         bm25 = BM25Okapi(tokenized_corpus)
         scores = bm25.get_scores(tokenized_query)
@@ -407,6 +562,14 @@ def _bm25_search(
                 })
 
         scored_candidates.sort(key=lambda x: x["bm25_score"], reverse=True)
+
+        # Log cross-document coverage
+        doc_coverage = set(c["document_id"] for c in scored_candidates[:top_k])
+        logger.info(
+            f"[BM25] Found {len(scored_candidates)} candidates across {len(doc_coverage)} documents "
+            f"(returning top {top_k})"
+        )
+
         return scored_candidates[:top_k]
     except Exception as bm_err:
         logger.warning(f"[BM25] Keyword search warning: {bm_err}")
@@ -518,6 +681,7 @@ def search_relevant_chunks(
 
     t0 = time.time()
     vector_results = []
+    qdrant_available = False
 
     # 1. Dense vector search
     try:
@@ -531,6 +695,7 @@ def search_relevant_chunks(
                 context_document_ids=context_document_ids
             )
             if vector_results:
+                qdrant_available = True
                 vector_results = [
                     r for r in vector_results
                     if not r.get("is_frontmatter")
@@ -540,7 +705,7 @@ def search_relevant_chunks(
         logger.warning(f"[Retrieval] Qdrant search warning: {ve}")
         vector_results = []
 
-    # 2. BM25 keyword search
+    # 2. BM25 keyword search (with synonym expansion)
     bm25_results = _bm25_search(
         db=db,
         user_id=user_id,
@@ -550,39 +715,46 @@ def search_relevant_chunks(
     )
 
     # 3. Hybrid Fusion via Reciprocal Rank Fusion (RRF)
+    bm25_only_mode = False
     if vector_results and bm25_results:
         candidates = reciprocal_rank_fusion(vector_results, bm25_results, k=60, top_k=QDRANT_CANDIDATE_K)
     elif vector_results:
         candidates = vector_results
     elif bm25_results:
         candidates = bm25_results
+        bm25_only_mode = True
     else:
         # Fallback to legacy SQL keyword search if both empty
         candidates = _sql_keyword_candidates(db, user_id, query, QDRANT_CANDIDATE_K, context_document_ids)
+        bm25_only_mode = True
+
+    # Adaptive rerank threshold: lower when Qdrant is offline (BM25-only)
+    effective_min_score = RERANK_MIN_SCORE_BM25_ONLY if bm25_only_mode else RERANK_MIN_SCORE
 
     t1 = time.time()
+    mode_label = "BM25-ONLY" if bm25_only_mode else "HYBRID"
     logger.info(
-        f"[Timing] Stage 1 Hybrid Retrieval (Dense={len(vector_results)}, BM25={len(bm25_results)}, "
-        f"Fused={len(candidates)}) took {t1 - t0:.3f}s"
+        f"[Timing] Stage 1 {mode_label} Retrieval (Dense={len(vector_results)}, BM25={len(bm25_results)}, "
+        f"Fused={len(candidates)}, min_score={effective_min_score}) took {t1 - t0:.3f}s"
     )
 
     if not candidates:
         logger.warning(f"[Retrieval] No candidate chunks found for query: '{query[:60]}'")
         return []
 
-    # 4. Cross-Encoder Re-ranking
+    # 4. Cross-Encoder Re-ranking (with adaptive threshold)
     reranked = rerank_chunks(
         query=query,
         candidates=candidates,
         top_k=top_k,
-        min_score=RERANK_MIN_SCORE,
+        min_score=effective_min_score,
     )
 
     t2 = time.time()
-    logger.info(f"[Timing] Stage 2 Cross-Encoder Reranking took {t2 - t1:.3f}s (returned {len(reranked)} chunks)")
+    logger.info(f"[Timing] Stage 2 Cross-Encoder Reranking took {t2 - t1:.3f}s (returned {len(reranked)} chunks, min_score={effective_min_score})")
 
     if not reranked:
-        logger.warning(f"[Retrieval] All candidates failed rerank min_score={RERANK_MIN_SCORE}.")
+        logger.warning(f"[Retrieval] All candidates failed rerank min_score={effective_min_score}.")
         return []
 
     # 5. Check if workflow expansion needed

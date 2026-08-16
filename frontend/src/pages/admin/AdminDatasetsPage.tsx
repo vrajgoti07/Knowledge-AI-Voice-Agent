@@ -5,8 +5,8 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Database, Plus, RefreshCw, Trash2, Loader2, CheckCircle2, AlertCircle, MessageSquare } from 'lucide-react'
-import { Button, Card, Badge } from '@/components/ui'
+import { Database, Plus, RefreshCw, Trash2, Loader2, CheckCircle2, AlertCircle, MessageSquare, AlertTriangle } from 'lucide-react'
+import { Button, Card, Badge, Modal } from '@/components/ui'
 import api, { apiGet, apiPost, apiDelete } from '@/services/api'
 import { toast } from '@/store/uiStore'
 import type { Document } from '@/types'
@@ -43,6 +43,8 @@ export default function AdminDatasetsPage() {
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [reindexingId, setReindexingId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Document | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchDatasets = async () => {
@@ -123,14 +125,32 @@ export default function AdminDatasetsPage() {
     }
   }
 
-  const handleDelete = async (datasetId: string, title: string) => {
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    const targetId = deleteTarget.id
+    const targetTitle = deleteTarget.title
+
     try {
-      await apiDelete(`/admin/datasets/${datasetId}`)
-      toast.success('Dataset Deleted', `Dataset "${title}" deleted from global knowledge base.`)
-      await fetchDatasets()
-    } catch (err) {
+      setIsDeleting(true)
+      // Optimistically remove from state immediately for fast responsive UI
+      setDatasets((prev) => prev.filter((d) => d.id !== targetId))
+      setDeleteTarget(null)
+
+      await apiDelete(`/admin/datasets/${targetId}`)
+      toast.success('Dataset Deleted', `Dataset "${targetTitle}" was removed from the global knowledge base.`)
+      
+      // Background sync
+      const updated = await apiGet<Document[]>('/admin/datasets')
+      if (Array.isArray(updated)) {
+        setDatasets(updated)
+      }
+    } catch (err: any) {
       console.error('Failed to delete dataset:', err)
-      toast.error('Delete Failed', `Could not delete ${title}`)
+      toast.error('Delete Failed', err.response?.data?.detail || `Could not delete ${targetTitle}`)
+      // Revert/refresh list on failure
+      fetchDatasets()
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -145,6 +165,72 @@ export default function AdminDatasetsPage() {
         onChange={handleFileChange}
         className="hidden"
       />
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <Modal
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setDeleteTarget(null)
+        }}
+        maxWidth="md"
+      >
+        <div className="space-y-5">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center shrink-0 text-red-400">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-[#F1F5F9]">Delete Knowledge Base Dataset?</h3>
+              <p className="text-xs text-[#94A3B8]">
+                This will permanently delete the dataset from the global enterprise knowledge base.
+              </p>
+            </div>
+          </div>
+
+          {deleteTarget && (
+            <div className="p-3.5 rounded-xl border border-white/10 bg-[#0A0E1A] space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#38BDF8]/10 text-[#38BDF8]">
+                  {deleteTarget.fileType}
+                </span>
+                <span className="text-xs font-semibold text-[#F1F5F9] truncate">
+                  {deleteTarget.title}
+                </span>
+              </div>
+              <p className="text-[11px] text-[#64748B] font-mono">
+                {((deleteTarget.fileSize || 0) / 1024).toFixed(1)} KB • {deleteTarget.chunks || 0} vector chunks
+              </p>
+            </div>
+          )}
+
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+            <span>All text chunks and vector embeddings for this dataset will be deleted. This cannot be undone.</span>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteTarget(null)}
+              disabled={isDeleting}
+              className="text-xs border-white/10 hover:bg-white/5"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              leftIcon={isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="text-xs bg-red-600 hover:bg-red-500 text-white"
+            >
+              {isDeleting ? 'Deleting Dataset...' : 'Yes, Delete Dataset'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* PAGE HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -224,7 +310,7 @@ export default function AdminDatasetsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {datasets.map((d) => (
-              <div key={d.id} className="p-4 rounded-xl border border-white/10 bg-[#0A0E1A] space-y-3 flex flex-col justify-between">
+              <div key={d.id} className="p-4 rounded-xl border border-white/10 bg-[#0A0E1A] space-y-3 flex flex-col justify-between hover:border-white/20 transition-all">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#38BDF8]/10 text-[#38BDF8]">
@@ -262,8 +348,8 @@ export default function AdminDatasetsPage() {
                   </div>
 
                   <button
-                    onClick={() => handleDelete(d.id, d.title)}
-                    className="p-1 text-[#64748B] hover:text-red-400 transition-colors cursor-pointer"
+                    onClick={() => setDeleteTarget(d)}
+                    className="p-1.5 rounded-lg text-[#64748B] hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                     title="Delete dataset"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

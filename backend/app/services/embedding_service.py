@@ -175,6 +175,69 @@ def split_into_sentences(text: str) -> List[str]:
     return [s.strip() for s in sentences if s.strip()]
 
 
+_TOC_DOTS_PATTERN = re.compile(r'(\.{3,}|\.\s+\.\s+\.\s+\.|\u2026)')
+_PAGE_NUMBER_END_PATTERN = re.compile(r'\b\d+\s*$', re.MULTILINE)
+
+
+def is_low_information_chunk(text: str, page_number: int = 1) -> bool:
+    """
+    Identifies chunks that contain mostly structural/meta text rather than substantive prose:
+    - Table-of-contents lines (repeated dot leaders . . . . 18, lists of chapter numbers with page numbers)
+    - Standalone headers with no body prose (<15 words, or <30 words without sentence punctuation)
+    - Fragmentary lines with <15 words and no mathematical formulas or code blocks
+    - Legal/copyright publishing frontmatter
+    """
+    if not text or not text.strip():
+        return True
+
+    clean = text.strip()
+    words = clean.split()
+    word_count = len(words)
+
+    # 1. Check for Table-of-Contents leader dots (e.g. "1.1 The Meaning of Intelligence . . . . 8")
+    if _TOC_DOTS_PATTERN.search(clean):
+        toc_lines = [
+            ln for ln in clean.splitlines()
+            if _TOC_DOTS_PATTERN.search(ln) or re.search(r'\d+\.\d+.*\s+\d+$', ln.strip())
+        ]
+        if len(toc_lines) >= 1 and (word_count < 80 or len(toc_lines) >= len(clean.splitlines()) * 0.3):
+            return True
+
+    # 2. Check for Table of Contents header on early pages (pages 1-10)
+    if (page_number or 1) <= 10:
+        if re.search(r'^(?:table of contents|contents|brief contents)\b', clean, re.IGNORECASE) and word_count < 80:
+            return True
+
+    # 3. Check for standalone headers or tiny non-substantive fragments (< 15 words)
+    if word_count < 15:
+        has_formula = "$" in clean or "\\theta" in clean or "\\sum" in clean or "\\nabla" in clean
+        has_code = "```" in clean or "def " in clean or "class " in clean
+        if not has_formula and not has_code:
+            return True
+
+    # Standalone header (< 30 words without any ending sentence punctuation like . ! ?)
+    if word_count < 30 and not re.search(r'[.!?]["\']?\s*$', clean):
+        has_formula = "$" in clean or "\\theta" in clean or "\\sum" in clean or "\\nabla" in clean
+        has_code = "```" in clean or "def " in clean or "class " in clean
+        if not has_formula and not has_code:
+            return True
+
+    # 4. Check for copyright / legal publishing frontmatter
+    legal_terms = [
+        "isbn", "copyright", "all rights reserved", "printed in",
+        "publisher", "proofreader", "editor:", "cataloging-in-publication",
+        "trademarks", "library of congress", "sans serif", "typeset", "published by"
+    ]
+    t_lower = clean.lower()
+    matches = sum(1 for kw in legal_terms if kw in t_lower)
+    if (page_number or 1) <= 3 and matches >= 1:
+        return True
+    if matches >= 2:
+        return True
+
+    return False
+
+
 def build_contextual_chunk_header(
     doc_title: str,
     section_title: Optional[str] = None,
@@ -251,12 +314,14 @@ def chunk_text(
     page_number: int = 1,
     chunk_size: int = 450,
     overlap: int = 65,
-    doc_title: str = "Document"
+    doc_title: str = "Document",
+    filter_low_info: bool = True
 ) -> List[Dict[str, Any]]:
     """
     Structure-aware chunker that respects document headings, paragraph boundaries, and sentence terminals.
     Ensures chunk boundaries ALWAYS land on complete sentences, never cutting mid-sentence.
     Generates parent-child links grouping consecutive chunks into parent sections.
+    Optionally filters out low-information meta/TOC chunks (filter_low_info=True).
     """
     chunks: List[Dict[str, Any]] = []
     if not text or not text.strip():
@@ -301,6 +366,10 @@ def chunk_text(
             parent_id = f"parent_{page_number}_{parent_idx}"
             parent_slice = merged_chunks[parent_idx * parent_group_size : (parent_idx + 1) * parent_group_size]
             parent_content = "\n\n".join(parent_slice)
+            is_low_info = is_low_information_chunk(content, page_number=page_number)
+
+            if filter_low_info and is_low_info:
+                continue
 
             chunks.append({
                 "chunk_index": idx,
@@ -314,6 +383,7 @@ def chunk_text(
                 "parent_section": None,
                 "parent_id": parent_id,
                 "parent_content": parent_content,
+                "is_low_information": is_low_info,
                 "embedding_input": build_embedding_input(doc_title, None, None, content)
             })
         return chunks
@@ -358,6 +428,10 @@ def chunk_text(
 
         # If section is reasonably sized (<= 450 words), keep as ONE intact chunk
         if len(words) <= chunk_size + 50:
+            is_low_info = is_low_information_chunk(block_text, page_number=page_number)
+            if filter_low_info and is_low_info:
+                continue
+
             chunks.append({
                 "chunk_index": chunk_index,
                 "content": block_text,
@@ -370,6 +444,7 @@ def chunk_text(
                 "parent_section": current_parent,
                 "parent_id": section_parent_id,
                 "parent_content": section_parent_content,
+                "is_low_information": is_low_info,
                 "embedding_input": build_embedding_input(doc_title, sec_title, sec_num, block_text)
             })
             chunk_index += 1
@@ -403,6 +478,10 @@ def chunk_text(
                 merged_sec_chunks.append("\n\n".join(curr_sec_block))
 
             for sc_content in merged_sec_chunks:
+                is_low_info = is_low_information_chunk(sc_content, page_number=page_number)
+                if filter_low_info and is_low_info:
+                    continue
+
                 chunks.append({
                     "chunk_index": chunk_index,
                     "content": sc_content,
@@ -415,6 +494,7 @@ def chunk_text(
                     "parent_section": current_parent,
                     "parent_id": section_parent_id,
                     "parent_content": section_parent_content,
+                    "is_low_information": is_low_info,
                     "embedding_input": build_embedding_input(doc_title, sec_title, sec_num, sc_content)
                 })
                 chunk_index += 1

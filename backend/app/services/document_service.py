@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.models.document import Document
 import hashlib
 from app.models.document_chunk import DocumentChunk
-from app.services.embedding_service import chunk_text, generate_embeddings
+from app.services.embedding_service import chunk_text, generate_embeddings, is_low_information_chunk
 from app.core.qdrant_client import upsert_document_chunks, delete_document_chunks_from_qdrant
 from app.db.session import SessionLocal
 
@@ -270,10 +270,12 @@ def extract_text_from_file(file_bytes: bytes, filename: str, ext: str) -> tuple[
 
 def is_boilerplate_text(content: str, page_number: int) -> bool:
     """
-    Detects if a page/chunk contains copyright, legal, or publishing frontmatter.
+    Detects if a page/chunk contains copyright, legal, publishing frontmatter, or low information.
     """
     if not content:
         return False
+    if is_low_information_chunk(content, page_number):
+        return True
     t_lower = content.lower()
     legal_terms = [
         "isbn", "copyright", "all rights reserved", "printed in",

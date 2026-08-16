@@ -39,6 +39,7 @@ export default function AdminDocumentsPage() {
   const [docs, setDocs] = useState<KBDocument[]>(INITIAL_KB_DOCS)
   const [search, setSearch] = useState('')
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<KBDocument | null>(null)
   const [newTitle, setNewTitle] = useState('')
   const [newCategory, setNewCategory] = useState(KB_CATEGORIES[0])
 
@@ -46,9 +47,12 @@ export default function AdminDocumentsPage() {
     setPageTitle('Admin — KB Repository')
   }, [setPageTitle])
 
-  const handleDelete = (id: string, title: string) => {
+  const confirmDelete = () => {
+    if (!deleteTarget) return
+    const { id, title } = deleteTarget
     setDocs((prev) => prev.filter((d) => d.id !== id))
     toast.info('Document Removed', `${title} deleted from KB store.`)
+    setDeleteTarget(null)
   }
 
   const handleReindex = (title: string) => {
@@ -143,7 +147,7 @@ export default function AdminDocumentsPage() {
                       <Button variant="ghost" size="sm" onClick={() => handleReindex(d.title)}>
                         <RefreshCw className="w-3.5 h-3.5 text-primary" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(d.id, d.title)}>
+                      <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(d)}>
                         <Trash2 className="w-3.5 h-3.5 text-danger" />
                       </Button>
                     </div>
@@ -154,6 +158,27 @@ export default function AdminDocumentsPage() {
           </table>
         </div>
       </Card>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete KB Document?"
+        description="Are you sure you want to remove this document from the curated repository?"
+      >
+        <div className="space-y-4 pt-2">
+          {deleteTarget && (
+            <div className="p-3 rounded-lg bg-bg-secondary border border-border">
+              <p className="text-sm font-semibold text-text-primary">{deleteTarget.title}</p>
+              <p className="text-xs text-text-muted mt-1">{deleteTarget.category} • {deleteTarget.size} • {deleteTarget.chunks} vectors</p>
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="danger" onClick={confirmDelete}>Delete Document</Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Add to KB Modal */}
       <Modal
