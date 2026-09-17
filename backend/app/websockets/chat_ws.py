@@ -43,7 +43,7 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str):
                 )
                 recent_messages.reverse()
 
-                # 2. Context window summary for long threads
+                # 2. Context window summary for long threads (run in thread to avoid blocking)
                 total_msgs_count = db.query(Message).filter(Message.conversation_id == conv.id).count()
                 if total_msgs_count > 8 and (total_msgs_count % 10 == 0 or not conv.running_summary):
                     try:
@@ -55,7 +55,9 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str):
                         )
                         msgs_to_summarize = all_prior_msgs[:-8] if len(all_prior_msgs) > 8 else all_prior_msgs
                         if msgs_to_summarize:
-                            new_summary = generate_conversation_summary(msgs_to_summarize, conv.running_summary)
+                            new_summary = await asyncio.to_thread(
+                                generate_conversation_summary, msgs_to_summarize, conv.running_summary
+                            )
                             if new_summary:
                                 conv.running_summary = new_summary
                                 db.flush()
@@ -73,16 +75,18 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str):
                 if conv.title == "New Research Session" or conv.title == "New Conversation":
                     conv.title = query[:40] + "..." if len(query) > 40 else query
 
-                # ── RAG call ──────────────────────────────────────────
+                # ── RAG call (run in thread to avoid blocking the async event loop) ──
                 t_start = time.time()
                 try:
-                    answer_text, citations_list, rag_metadata = generate_rag_response(
-                        db=db,
-                        user_id=conv.user_id,
-                        conversation_id=conv.id,
-                        user_query=query,
-                        conversation_history=recent_messages,
-                        running_summary=getattr(conv, 'running_summary', None),
+                    answer_text, citations_list, rag_metadata = await asyncio.to_thread(
+                        generate_rag_response,
+                        db,
+                        conv.user_id,
+                        conv.id,
+                        query,
+                        None,  # context_document_ids
+                        recent_messages,
+                        getattr(conv, 'running_summary', None),
                     )
                     t_end = time.time()
                     logger.info(

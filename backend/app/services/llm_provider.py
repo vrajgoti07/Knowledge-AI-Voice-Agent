@@ -123,6 +123,7 @@ def get_provider_status() -> Dict[str, Any]:
     chain.append("fallback")
 
     return {
+        "llm_available": any(p["enabled"] for p in _provider_state.values()),
         "providers": {
             "groq": {"enabled": _provider_state["groq"]["enabled"], "status": _provider_state["groq"]["status"]},
             "gemini": {"enabled": _provider_state["gemini"]["enabled"], "status": _provider_state["gemini"]["status"]},
@@ -130,6 +131,11 @@ def get_provider_status() -> Dict[str, Any]:
         "active_provider": active,
         "fallback_chain": chain,
     }
+
+
+def is_llm_available() -> bool:
+    """Fast check: returns True if at least one LLM provider is configured and enabled."""
+    return any(p["enabled"] for p in _provider_state.values())
 
 
 _BOILERPLATE_LINE_PATTERNS = [
@@ -370,13 +376,27 @@ def format_fallback_chunks(
     """
     if not chunks:
         logger.info("[Fallback] 0 chunks provided — returning no-match message.")
-        return {
-            "answer": (
-                "I couldn't find content closely matching your question in the uploaded documents. "
-                "Try rephrasing your query, or check that the relevant document has been uploaded and indexed."
-            ),
-            "speech_text": "I couldn't find closely matching content in your documents for that question.",
-        }
+        llm_up = is_llm_available()
+        if llm_up:
+            # LLM is available but retrieval found nothing — genuinely no matching docs
+            return {
+                "answer": (
+                    "I couldn't find content closely matching your question in the uploaded documents. "
+                    "Try rephrasing your query, or check that the relevant document has been uploaded and indexed."
+                ),
+                "speech_text": "I couldn't find closely matching content in your documents for that question.",
+            }
+        else:
+            # No LLM AND no chunks — tell the user the system is in offline mode
+            return {
+                "answer": (
+                    "I'm currently running in offline mode (no AI provider connected). "
+                    "I searched your documents but couldn't find a strong match for this query. "
+                    "**To get the best results:** try more specific queries like *'what is linear algebra'* or *'explain matrix multiplication'* "
+                    "instead of broad requests. Alternatively, configure a Groq or Gemini API key for AI-powered answers."
+                ),
+                "speech_text": "I'm running in offline mode. Try a more specific query or configure an API key for AI-powered answers.",
+            }
 
     is_workflow = any(c.get("is_workflow_expanded") for c in chunks) or len(chunks) >= 4
 
@@ -477,6 +497,11 @@ def _get_timeout() -> float:
 
 def classify_question_llm(query: str) -> Optional[str]:
     """Issues a fast LLM call (Groq) to classify an ambiguous question into one of the 6 core types."""
+    # Skip the LLM call entirely if no provider is available — saves 5-30s timeout
+    if not is_llm_available():
+        logger.info("[QuestionClassifier] No LLM available, skipping LLM classification.")
+        return None
+
     prompt = (
         "Classify the following user question into EXACTLY ONE of these categories: "
         "DEFINITION, EXPLANATION, LIST, COMPARISON, FORMULA, SUMMARY.\n\n"
@@ -631,6 +656,11 @@ The user's new message is: "{raw_query}"
 If this new message is a follow-up that depends on the previous conversation (e.g. "explain that more," "give an example," "what about X" referring to something just discussed), rewrite it into a complete, standalone question that includes the necessary context. If it's already a complete, standalone question unrelated to the prior conversation, return it exactly as-is.
 
 Return ONLY the rewritten question, nothing else."""
+
+    # Skip the LLM call entirely if no provider is available — saves 5-30s timeout
+    if not is_llm_available():
+        logger.info("[QueryRewrite] No LLM available, using original query.")
+        return raw_query
 
     try:
         response, _ = _call_llm(rewrite_prompt, max_tokens=150, temperature=0.1)

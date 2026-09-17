@@ -23,8 +23,8 @@ from app.core.qdrant_client import search_qdrant_chunks, fetch_parent_section_ch
 logger = logging.getLogger("knowledge_ai.retrieval")
 
 # ── Tunable thresholds ────────────────────────────────────────────────────────
-RERANK_MIN_SCORE: float = 0.35
-RERANK_MIN_SCORE_BM25_ONLY: float = 0.28  # Lower threshold when Qdrant is offline
+RERANK_MIN_SCORE: float = 0.20
+RERANK_MIN_SCORE_BM25_ONLY: float = 0.15  # Lower threshold when Qdrant is offline
 QDRANT_CANDIDATE_K: int = 30  # Increased from 20 for better cross-PDF coverage
 FINAL_TOP_K: int = 8
 MAX_CHUNKS_PER_DOC: int = 3
@@ -410,12 +410,15 @@ def rerank_chunks(
 
         filtered = [s for s in scored if s["rerank_score"] >= min_score]
         if not filtered:
+            # SOFT FALLBACK: return top 3 by score instead of [] so the
+            # LLM / fallback formatter can still produce a useful answer.
+            soft_top = scored[:3] if scored else []
             best = scored[0] if scored else {}
             logger.warning(
-                f"[Rerank] HARD THRESHOLD ENFORCED: All {len(scored)} candidates scored below {min_score}. "
-                f"Best: rerank_norm={best.get('rerank_score', 0):.4f}. Returning []."
+                f"[Rerank] SOFT FALLBACK: All {len(scored)} candidates scored below {min_score}. "
+                f"Best: rerank_norm={best.get('rerank_score', 0):.4f}. Returning top {len(soft_top)} for LLM/fallback."
             )
-            return []
+            return apply_diversity_cap(soft_top, max_per_doc=max_per_doc, top_k=top_k)
 
         return apply_diversity_cap(filtered, max_per_doc=max_per_doc, top_k=top_k)
 

@@ -1,5 +1,6 @@
 import logging
 import uuid
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -177,7 +178,7 @@ def delete_conversation(
     return {"message": "Conversation deleted successfully"}
 
 @router.post("/{conversation_id}/messages", response_model=MessageResponse)
-def post_message(
+async def post_message(
     conversation_id: str,
     req: CreateMessageRequest,
     current_user: User = Depends(get_current_user),
@@ -210,7 +211,9 @@ def post_message(
             # Summarize turns before the sliding window (all messages except the last 8)
             msgs_to_summarize = all_prior_msgs[:-8] if len(all_prior_msgs) > 8 else all_prior_msgs
             if msgs_to_summarize:
-                new_summary = generate_conversation_summary(msgs_to_summarize, conv.running_summary)
+                new_summary = await asyncio.to_thread(
+                    generate_conversation_summary, msgs_to_summarize, conv.running_summary
+                )
                 if new_summary:
                     conv.running_summary = new_summary
                     db.flush()
@@ -234,14 +237,15 @@ def post_message(
 
     # 4. Generate RAG response with conversation history & running summary
     try:
-        answer_text, citations_list, rag_metadata = generate_rag_response(
-            db=db,
-            user_id=current_user.id,
-            conversation_id=conv.id,
-            user_query=user_content,
-            context_document_ids=req.context_document_ids,
-            conversation_history=recent_messages,
-            running_summary=getattr(conv, 'running_summary', None),
+        answer_text, citations_list, rag_metadata = await asyncio.to_thread(
+            generate_rag_response,
+            db,
+            current_user.id,
+            conv.id,
+            user_content,
+            req.context_document_ids,
+            recent_messages,
+            getattr(conv, 'running_summary', None),
         )
     except Exception as ge:
         logger.error(f"Error generating RAG response: {ge}")
