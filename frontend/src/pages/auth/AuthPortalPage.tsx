@@ -65,6 +65,67 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
   const [errors, setErrors] = useState<{ email?: string; password?: string; confirmPassword?: string; fullName?: string }>({})
   const [serverError, setServerError] = useState<string | null>(null)
 
+  // ── ACTIVITY LEVEL COMPUTATION ─────────────────────────────
+  // Tracks how many form inputs are currently focused and whether
+  // fields have content. Produces a 0-1 value that rises on focus/
+  // keystroke and decays on blur when fields are empty.
+  const focusCountRef = useRef(0)
+  const keystrokeSpikeRef = useRef(0)
+  const activityTargetRef = useRef(0)
+  const decayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const fieldValuesRef = useRef({ email, password, confirmPassword, fullName })
+
+  // Keep ref in sync with state on every render
+  fieldValuesRef.current = { email, password, confirmPassword, fullName }
+
+  const computeActivityTarget = () => {
+    const hasFocus = focusCountRef.current > 0
+    const vals = fieldValuesRef.current
+    const filledFields = [vals.email, vals.password, vals.confirmPassword, vals.fullName].filter((v) => v.length > 0).length
+    const contentBoost = Math.min(filledFields * 0.15, 0.6)
+
+    if (hasFocus) {
+      activityTargetRef.current = Math.min(0.4 + contentBoost + keystrokeSpikeRef.current, 1.0)
+    } else if (filledFields > 0) {
+      activityTargetRef.current = Math.min(0.15 + contentBoost * 0.5, 0.4)
+    } else {
+      activityTargetRef.current = 0
+    }
+  }
+
+  // Smooth decay/rise interval — runs once on mount, reads from refs
+  useEffect(() => {
+    decayIntervalRef.current = setInterval(() => {
+      // Decay keystroke spike
+      keystrokeSpikeRef.current = Math.max(0, keystrokeSpikeRef.current - 0.02)
+      computeActivityTarget()
+
+      setActivityLevel((prev) => {
+        const target = activityTargetRef.current
+        const diff = target - prev
+        if (Math.abs(diff) < 0.005) return target
+        // Asymmetric: fast rise (~150ms), slow decay (~600ms)
+        const rate = diff > 0 ? 0.12 : 0.03
+        return prev + diff * rate
+      })
+    }, 50)
+
+    return () => {
+      if (decayIntervalRef.current) clearInterval(decayIntervalRef.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleFieldFocus = () => {
+    focusCountRef.current += 1
+    computeActivityTarget()
+  }
+
+  const handleFieldBlur = () => {
+    focusCountRef.current = Math.max(0, focusCountRef.current - 1)
+    computeActivityTarget()
+  }
+
   // Reset inputs when mode changes
   useEffect(() => {
     setServerError(null)
@@ -75,11 +136,11 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
   // Trigger dynamic acoustic wave reactivity on typing
   const triggerTypingPulse = () => {
     setIsTyping(true)
-    setActivityLevel(1.0)
+    keystrokeSpikeRef.current = Math.min(keystrokeSpikeRef.current + 0.15, 0.4)
+    computeActivityTarget()
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false)
-      setActivityLevel(0)
     }, 750)
   }
 
@@ -222,6 +283,8 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                     setServerError(null)
                     if (errors.email) setErrors((p) => ({ ...p, email: undefined }))
                   }}
+                  onFocus={handleFieldFocus}
+                  onBlur={handleFieldBlur}
                   error={errors.email}
                   icon={Mail}
                   name="kai_usr_voice_id"
@@ -240,6 +303,8 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                     setServerError(null)
                     if (errors.password) setErrors((p) => ({ ...p, password: undefined }))
                   }}
+                  onFocus={handleFieldFocus}
+                  onBlur={handleFieldBlur}
                   error={errors.password}
                   icon={Lock}
                   name="kai_usr_voice_token"
@@ -266,6 +331,8 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                     triggerTypingPulse()
                     if (errors.fullName) setErrors((p) => ({ ...p, fullName: undefined }))
                   }}
+                  onFocus={handleFieldFocus}
+                  onBlur={handleFieldBlur}
                   error={errors.fullName}
                   icon={User}
                   name="kai_reg_name"
@@ -283,6 +350,8 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                     setServerError(null)
                     if (errors.email) setErrors((p) => ({ ...p, email: undefined }))
                   }}
+                  onFocus={handleFieldFocus}
+                  onBlur={handleFieldBlur}
                   error={errors.email}
                   icon={Mail}
                   name="kai_reg_email"
@@ -301,6 +370,8 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                     setServerError(null)
                     if (errors.password) setErrors((p) => ({ ...p, password: undefined }))
                   }}
+                  onFocus={handleFieldFocus}
+                  onBlur={handleFieldBlur}
                   error={errors.password}
                   icon={Lock}
                   name="kai_reg_pass"
@@ -317,6 +388,8 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                     triggerTypingPulse()
                     if (errors.confirmPassword) setErrors((p) => ({ ...p, confirmPassword: undefined }))
                   }}
+                  onFocus={handleFieldFocus}
+                  onBlur={handleFieldBlur}
                   error={errors.confirmPassword}
                   icon={Lock}
                   name="kai_reg_pass_confirm"

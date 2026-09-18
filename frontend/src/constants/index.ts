@@ -34,13 +34,12 @@ export const ROUTES = {
   KNOWLEDGE_HUB:   '/dashboard',
   HISTORY:         '/history',
 
-  // Protected Admin Routes (7 Primary Prompt Sidebar Items)
+  // Protected Admin Routes
   ADMIN:               '/admin',
   ADMIN_MODELS:        '/admin/models',
   ADMIN_DATASETS:      '/admin/datasets',
   ADMIN_USERS:         '/admin/users',
-  ADMIN_SYSTEM_HEALTH: '/admin/system-health',
-  ADMIN_LOGS:          '/admin/logs',
+  ADMIN_MONITORING:    '/admin/monitoring',
   ADMIN_SETTINGS:      '/admin/settings',
 
   // Errors

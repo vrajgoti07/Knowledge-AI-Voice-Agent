@@ -1,12 +1,8 @@
 // ============================================================
-// VoiceprintResonatorBackground — Holographic Cyber-Acoustic Frequency Matrix
-// Dedicated exclusively for Sign In / Login ("Authorize Voice Session")
-// Features:
-// 1. Flanking 3D Spectrogram Equalizer Columns on Left & Right Wings.
-// 2. Continuous Horizontal Audio Laser Soundwave Ribbons spanning the horizon.
-// 3. Ascending Audio Frequency Energy Embers floating in depth.
-// 4. Cursor tracking & keystroke energy surges in real-time.
-// Strict Palette: Deep Space Black #050811, Neural Cyan #00F2FE, Electric Blue #0088FF
+// VoiceprintResonatorBackground — "Listening Field"
+// A unified background system that idles quietly and visibly
+// reacts when the user interacts with auth forms.
+// Strict Palette: #050811, #00F2FE, #0088FF, #818CF8, #38BDF8
 // ============================================================
 
 import React, { useEffect, useRef } from 'react'
@@ -16,19 +12,51 @@ interface VoiceprintResonatorBackgroundProps {
   activityLevel?: number
 }
 
-interface AscendingParticle {
+// ── Types ────────────────────────────────────────────────────────
+interface ListeningTick {
+  x: number
+  yOffset: number // irregular vertical offset from center
+  targetHeight: number // driven by activity
+  currentHeight: number // smoothed display height
+  phase: number // per-bar random phase offset
+  idleHeight: number // tiny resting height (2-5px)
+}
+
+interface DustDot {
   x: number
   y: number
+  vx: number
   vy: number
   radius: number
-  alpha: number
+  baseAlpha: number
   color: string
 }
+
+interface RingPulse {
+  birth: number // frame when spawned
+  maxRadius: number
+  alpha: number
+}
+
+// ── Constants ────────────────────────────────────────────────────
+const TICK_COUNT_PER_SIDE = 9
+const DUST_COUNT = 8
+const WAVE_POINTS_STEP = 5 // px between wave sample points
+const MAX_MOUSE_DISPLACEMENT = 12
+const RING_LIFETIME_FRAMES = 90 // ~1.5s at 60fps
+
+const PALETTE = {
+  cyan: '#00F2FE',
+  blue: '#0088FF',
+  indigo: '#818CF8',
+  sky: '#38BDF8',
+} as const
 
 export function VoiceprintResonatorBackground({ activityLevel = 0 }: VoiceprintResonatorBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const mouseRef = useRef<{ x: number | null; y: number | null }>({ x: null, y: null })
   const activityRef = useRef(activityLevel)
+  const prevActivityThreshold = useRef(0)
 
   useEffect(() => {
     activityRef.current = activityLevel
@@ -53,216 +81,256 @@ export function VoiceprintResonatorBackground({ activityLevel = 0 }: VoiceprintR
     let width = (canvas.width = window.innerWidth)
     let height = (canvas.height = window.innerHeight)
 
+    // ── Resize ──────────────────────────────────────────────────
     const handleResize = () => {
       if (!canvas) return
       width = canvas.width = window.innerWidth
       height = canvas.height = window.innerHeight
-      initParticles()
+      initTicks()
+      initDust()
     }
-
     window.addEventListener('resize', handleResize)
 
-    let step = 0
+    // ── State ───────────────────────────────────────────────────
+    let frame = 0
     let smoothedActivity = 0
 
-    // ── 1. ASCENDING FREQUENCY PARTICLES ────────────────────────────
-    let particles: AscendingParticle[] = []
-    const particleColors = ['#00F2FE', '#38BDF8', '#0088FF', '#818CF8']
+    // ── 1. LISTENING TICKS (left + right flanks) ────────────────
+    let leftTicks: ListeningTick[] = []
+    let rightTicks: ListeningTick[] = []
 
-    const initParticles = () => {
-      particles = []
-      for (let i = 0; i < 35; i++) {
-        particles.push({
+    const initTicks = () => {
+      const makeTicks = (side: 'left' | 'right'): ListeningTick[] => {
+        const ticks: ListeningTick[] = []
+        const margin = 30
+        const zone = width * 0.22
+        for (let i = 0; i < TICK_COUNT_PER_SIDE; i++) {
+          // Irregular spacing: base spacing + random jitter
+          const baseSpacing = zone / (TICK_COUNT_PER_SIDE + 1)
+          const jitter = (Math.random() - 0.5) * baseSpacing * 0.6
+          const localX = margin + baseSpacing * (i + 1) + jitter
+          const x = side === 'left' ? localX : width - localX
+          ticks.push({
+            x,
+            yOffset: (Math.random() - 0.5) * 30,
+            targetHeight: 0,
+            currentHeight: 0,
+            phase: Math.random() * Math.PI * 2,
+            idleHeight: 2 + Math.random() * 3,
+          })
+        }
+        return ticks
+      }
+      leftTicks = makeTicks('left')
+      rightTicks = makeTicks('right')
+    }
+    initTicks()
+
+    // ── 2. AMBIENT DUST DOTS ────────────────────────────────────
+    let dust: DustDot[] = []
+    const dustColors = [PALETTE.cyan, PALETTE.sky, PALETTE.blue, PALETTE.indigo]
+
+    const initDust = () => {
+      dust = []
+      for (let i = 0; i < DUST_COUNT; i++) {
+        dust.push({
           x: Math.random() * width,
           y: Math.random() * height,
-          vy: -(Math.random() * 0.8 + 0.3),
-          radius: Math.random() * 1.6 + 0.8,
-          alpha: Math.random() * 0.5 + 0.2,
-          color: particleColors[Math.floor(Math.random() * particleColors.length)],
+          vx: (Math.random() - 0.5) * 0.15,
+          vy: (Math.random() - 0.5) * 0.15,
+          radius: 1 + Math.random() * 1.2,
+          baseAlpha: 0.08 + Math.random() * 0.12,
+          color: dustColors[Math.floor(Math.random() * dustColors.length)],
         })
       }
     }
-    initParticles()
+    initDust()
 
-    // ── 2. FLANKING SPECTROGRAM COLUMN CONFIG ───────────────────────
-    const wingBarsCount = 26
+    // ── 3. RING PULSES ──────────────────────────────────────────
+    let rings: RingPulse[] = []
 
-    // ── 3. HORIZONTAL LASER SOUNDWAVES CONFIG ───────────────────────
-    const laserWaves = [
-      {
-        stroke: '#00F2FE',
-        glow: 'rgba(0, 242, 254, 0.9)',
-        lineWidth: 2.2,
-        baseYRatio: 0.50,
-        amp: 48,
-        freq: 0.0028,
-        speed: 0.016,
-        phase: 0,
-      },
-      {
-        stroke: '#0088FF',
-        glow: 'rgba(0, 136, 255, 0.8)',
-        lineWidth: 1.8,
-        baseYRatio: 0.55,
-        amp: 60,
-        freq: 0.0020,
-        speed: -0.012,
-        phase: Math.PI * 0.5,
-      },
-      {
-        stroke: '#818CF8',
-        glow: 'rgba(129, 140, 248, 0.7)',
-        lineWidth: 1.4,
-        baseYRatio: 0.46,
-        amp: 36,
-        freq: 0.0035,
-        speed: 0.020,
-        phase: Math.PI * 0.85,
-      },
-    ]
+    // ── Helpers ─────────────────────────────────────────────────
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 
+    // ── Render Loop ─────────────────────────────────────────────
     const render = () => {
-      step += 1
-      smoothedActivity += (activityRef.current - smoothedActivity) * 0.08
+      frame += 1
+      // Smooth activity with asymmetric attack/decay
+      const rawAct = activityRef.current
+      const attackRate = 0.15 // ~150ms to reach target at 60fps
+      const decayRate = 0.025 // ~600ms to decay
+      const rate = rawAct > smoothedActivity ? attackRate : decayRate
+      smoothedActivity = lerp(smoothedActivity, rawAct, rate)
       const act = smoothedActivity
+
       const mouse = mouseRef.current
 
       ctx.clearRect(0, 0, width, height)
 
-      const centerY = height * 0.50
+      const centerX = width * 0.5
+      const centerY = height * 0.5
 
-      // ── DRAW ASCENDING FREQUENCY PARTICLES ──────────────────────────
-      particles.forEach((p) => {
-        p.y += p.vy * (1 + act * 1.8)
-        if (p.y < 0) {
-          p.y = height
-          p.x = Math.random() * width
-        }
+      // ── RING PULSE: check threshold crossing ────────────────
+      const thresholdStep = 0.25
+      const currentThreshold = Math.floor(rawAct / thresholdStep)
+      if (currentThreshold > prevActivityThreshold.current && rawAct > 0.2) {
+        rings.push({
+          birth: frame,
+          maxRadius: Math.min(width, height) * 0.4,
+          alpha: 0.2 + act * 0.1,
+        })
+      }
+      prevActivityThreshold.current = currentThreshold
 
+      // ── DRAW DUST DOTS ──────────────────────────────────────
+      dust.forEach((d) => {
+        d.x += d.vx
+        d.y += d.vy
+        // Wrap around
+        if (d.x < 0) d.x = width
+        if (d.x > width) d.x = 0
+        if (d.y < 0) d.y = height
+        if (d.y > height) d.y = 0
+
+        const alpha = d.baseAlpha + act * 0.08
         ctx.beginPath()
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
-        ctx.fillStyle = p.color
-        ctx.shadowColor = p.color
-        ctx.shadowBlur = 8
+        ctx.arc(d.x, d.y, d.radius, 0, Math.PI * 2)
+        ctx.fillStyle = d.color
+        ctx.globalAlpha = Math.min(alpha, 0.25)
         ctx.fill()
-        ctx.shadowBlur = 0
+        ctx.globalAlpha = 1.0
       })
 
-      // ── DRAW LEFT FLANK SPECTROGRAM EQUALIZER BARS ─────────────────
-      const leftWingWidth = width * 0.32
-      const barSpacingLeft = leftWingWidth / wingBarsCount
+      // ── DRAW WAVE RIBBON PAIR ───────────────────────────────
+      // One pair: upper ribbon and lower ribbon, mirrored around center
+      const waveBaseAmp = 20 + act * 35 // 20-55px based on activity
+      const waveCycleSpeed = 0.0004 + act * 0.0003 // faster with activity
+      const waveFreq = 0.003
+      const waveOffset = 80 + act * 20 // distance from center (80-100px)
+      const wavePhase = frame * waveCycleSpeed * 60 // normalize to ~10-14s idle cycle
 
-      for (let i = 0; i < wingBarsCount; i++) {
-        const x = 20 + i * barSpacingLeft
-        // Harmonic formula: higher energy on edges, tapering towards center
-        const harmonic =
-          Math.sin(step * 0.05 + i * 0.3) * 45 +
-          Math.cos(step * 0.08 + i * 0.6) * 30 +
-          Math.sin(step * 0.02 + i * 0.15) * 20 +
-          55 +
-          act * 85
-
-        const barHeight = Math.max(12, harmonic)
-        const yTop = centerY - barHeight / 2
-        const yBottom = centerY + barHeight / 2
-
-        // Bar Gradient
-        const grad = ctx.createLinearGradient(x, yTop, x, yBottom)
-        grad.addColorStop(0, '#00F2FE')
-        grad.addColorStop(0.5, '#0088FF')
-        grad.addColorStop(1, 'rgba(129, 140, 248, 0.4)')
-
+      const drawWaveRibbon = (yBase: number, mirror: boolean, color: string, glowColor: string, lineW: number) => {
         ctx.beginPath()
-        ctx.moveTo(x, yTop)
-        ctx.lineTo(x, yBottom)
-        ctx.strokeStyle = grad
-        ctx.lineWidth = Math.min(4, barSpacingLeft * 0.65)
-        ctx.stroke()
-
-        // Luminous Peak Cap Dot
-        ctx.beginPath()
-        ctx.arc(x, yTop - 4, 2, 0, Math.PI * 2)
-        ctx.fillStyle = '#00F2FE'
-        ctx.shadowColor = '#00F2FE'
-        ctx.shadowBlur = 8
-        ctx.fill()
-        ctx.shadowBlur = 0
-      }
-
-      // ── DRAW RIGHT FLANK SPECTROGRAM EQUALIZER BARS ────────────────
-      const rightWingWidth = width * 0.32
-      const barSpacingRight = rightWingWidth / wingBarsCount
-
-      for (let i = 0; i < wingBarsCount; i++) {
-        const x = width - 20 - i * barSpacingRight
-        const harmonic =
-          Math.cos(step * 0.06 + i * 0.35) * 45 +
-          Math.sin(step * 0.07 + i * 0.55) * 30 +
-          Math.cos(step * 0.025 + i * 0.2) * 20 +
-          55 +
-          act * 85
-
-        const barHeight = Math.max(12, harmonic)
-        const yTop = centerY - barHeight / 2
-        const yBottom = centerY + barHeight / 2
-
-        const grad = ctx.createLinearGradient(x, yTop, x, yBottom)
-        grad.addColorStop(0, '#00F2FE')
-        grad.addColorStop(0.5, '#0088FF')
-        grad.addColorStop(1, 'rgba(129, 140, 248, 0.4)')
-
-        ctx.beginPath()
-        ctx.moveTo(x, yTop)
-        ctx.lineTo(x, yBottom)
-        ctx.strokeStyle = grad
-        ctx.lineWidth = Math.min(4, barSpacingRight * 0.65)
-        ctx.stroke()
-
-        // Luminous Peak Cap Dot
-        ctx.beginPath()
-        ctx.arc(x, yTop - 4, 2, 0, Math.PI * 2)
-        ctx.fillStyle = '#38BDF8'
-        ctx.shadowColor = '#38BDF8'
-        ctx.shadowBlur = 8
-        ctx.fill()
-        ctx.shadowBlur = 0
-      }
-
-      // ── DRAW HORIZONTAL AUDIO LASER SOUNDWAVE RIBBONS ───────────────
-      const activityMultiplier = 1 + act * 1.6
-      const speedMultiplier = 1 + act * 1.3
-
-      laserWaves.forEach((w) => {
-        const baseY = height * w.baseYRatio
-        const amp = w.amp * activityMultiplier
-        const phase = step * w.speed * speedMultiplier + w.phase
-
-        ctx.beginPath()
-        for (let x = 0; x <= width; x += 4) {
+        for (let x = 0; x <= width; x += WAVE_POINTS_STEP) {
+          // Mouse ripple displacement (subtle, max 12px)
           let mouseFactor = 0
           if (mouse.x !== null && mouse.y !== null) {
-            const dist = Math.abs(x - mouse.x)
-            if (dist < 220) {
-              mouseFactor = (1 - dist / 220) * 24
+            const dist = Math.hypot(x - mouse.x, yBase - mouse.y)
+            if (dist < 250) {
+              mouseFactor = (1 - dist / 250) * MAX_MOUSE_DISPLACEMENT * (mirror ? 1 : -1)
             }
           }
 
+          const amp = waveBaseAmp * (mirror ? -1 : 1)
           const y =
-            baseY +
-            Math.sin(x * w.freq + phase) * amp +
-            Math.cos(x * w.freq * 1.7 + phase * 0.9) * (amp * 0.35) -
+            yBase +
+            Math.sin(x * waveFreq + wavePhase) * amp +
+            Math.sin(x * waveFreq * 2.3 + wavePhase * 0.7) * amp * 0.25 +
             mouseFactor
 
           if (x === 0) ctx.moveTo(x, y)
           else ctx.lineTo(x, y)
         }
-
-        ctx.strokeStyle = w.stroke
-        ctx.lineWidth = w.lineWidth
-        ctx.shadowColor = w.glow
-        ctx.shadowBlur = 14
+        ctx.strokeStyle = color
+        ctx.lineWidth = lineW
+        ctx.shadowColor = glowColor
+        ctx.shadowBlur = 10 + act * 6
         ctx.stroke()
         ctx.shadowBlur = 0
+      }
+
+      // Upper ribbon (above center)
+      drawWaveRibbon(
+        centerY - waveOffset,
+        false,
+        PALETTE.cyan,
+        'rgba(0, 242, 254, 0.6)',
+        1.5 + act * 0.8
+      )
+      // Lower ribbon (below center, mirrored)
+      drawWaveRibbon(
+        centerY + waveOffset,
+        true,
+        PALETTE.blue,
+        'rgba(0, 136, 255, 0.5)',
+        1.5 + act * 0.8
+      )
+
+      // ── DRAW LISTENING TICKS ────────────────────────────────
+      const drawTicks = (ticks: ListeningTick[]) => {
+        ticks.forEach((tick, i) => {
+          // Compute target height from activity + per-bar variation
+          const barVariation = Math.sin(frame * 0.08 + tick.phase) * 0.3 + 0.7
+          tick.targetHeight = tick.idleHeight + act * 90 * barVariation
+
+          // Asymmetric smoothing per-bar: fast attack, slow decay
+          const barRate = tick.targetHeight > tick.currentHeight ? 0.18 : 0.04
+          tick.currentHeight = lerp(tick.currentHeight, tick.targetHeight, barRate)
+
+          const h = tick.currentHeight
+          const x = tick.x
+          const cy = centerY + tick.yOffset
+          const yTop = cy - h / 2
+          const yBottom = cy + h / 2
+
+          // Gradient from cyan to indigo
+          const grad = ctx.createLinearGradient(x, yTop, x, yBottom)
+          grad.addColorStop(0, PALETTE.cyan)
+          grad.addColorStop(0.5, PALETTE.blue)
+          grad.addColorStop(1, 'rgba(129, 140, 248, 0.35)')
+
+          // Bar opacity: subtle at idle, full at active
+          const barAlpha = Math.min(0.3 + act * 0.7, 1.0)
+          ctx.globalAlpha = barAlpha
+
+          ctx.beginPath()
+          ctx.moveTo(x, yTop)
+          ctx.lineTo(x, yBottom)
+          ctx.strokeStyle = grad
+          ctx.lineWidth = 2.5
+          ctx.lineCap = 'round'
+          ctx.stroke()
+
+          // Peak cap dot (only visible when tick is tall enough)
+          if (h > 8) {
+            ctx.beginPath()
+            ctx.arc(x, yTop - 3, 1.5, 0, Math.PI * 2)
+            ctx.fillStyle = PALETTE.cyan
+            ctx.shadowColor = PALETTE.cyan
+            ctx.shadowBlur = 6
+            ctx.fill()
+            ctx.shadowBlur = 0
+          }
+
+          ctx.globalAlpha = 1.0
+        })
+      }
+
+      drawTicks(leftTicks)
+      drawTicks(rightTicks)
+
+      // ── DRAW RING PULSES ────────────────────────────────────
+      rings = rings.filter((ring) => {
+        const age = frame - ring.birth
+        if (age > RING_LIFETIME_FRAMES) return false
+
+        const progress = age / RING_LIFETIME_FRAMES
+        const eased = 1 - Math.pow(1 - progress, 3) // ease-out cubic
+        const radius = eased * ring.maxRadius
+        const alpha = ring.alpha * (1 - progress)
+
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
+        ctx.strokeStyle = PALETTE.sky
+        ctx.lineWidth = 1.5 * (1 - progress * 0.5)
+        ctx.globalAlpha = alpha
+        ctx.shadowColor = PALETTE.sky
+        ctx.shadowBlur = 12
+        ctx.stroke()
+        ctx.shadowBlur = 0
+        ctx.globalAlpha = 1.0
+
+        return true
       })
 
       animationFrameId = requestAnimationFrame(render)
@@ -284,28 +352,30 @@ export function VoiceprintResonatorBackground({ activityLevel = 0 }: VoiceprintR
       transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
       className="absolute inset-0 overflow-hidden pointer-events-none z-0 select-none bg-[#050811]"
     >
-      {/* ── AMBIENT CYBER LIGHT GLOW SPOTS ────────────────────────────── */}
+      {/* ── AMBIENT RADIAL GLOW BLOBS (toned down) ──────────────────── */}
       <div
-        className="absolute top-1/2 left-10 -translate-y-1/2 w-[550px] h-[550px] rounded-full pointer-events-none opacity-30 animate-pulse"
+        className="absolute top-1/2 left-10 -translate-y-1/2 w-[550px] h-[550px] rounded-full pointer-events-none animate-pulse"
         style={{
-          background: 'radial-gradient(circle, rgba(0, 242, 254, 0.22) 0%, rgba(0, 136, 255, 0.10) 50%, transparent 75%)',
+          background: 'radial-gradient(circle, rgba(0, 242, 254, 0.14) 0%, rgba(0, 136, 255, 0.06) 50%, transparent 75%)',
           filter: 'blur(80px)',
-          animationDuration: '7s',
+          opacity: 0.20,
+          animationDuration: '10s',
         }}
       />
       <div
-        className="absolute top-1/2 right-10 -translate-y-1/2 w-[550px] h-[550px] rounded-full pointer-events-none opacity-30 animate-pulse"
+        className="absolute top-1/2 right-10 -translate-y-1/2 w-[550px] h-[550px] rounded-full pointer-events-none animate-pulse"
         style={{
-          background: 'radial-gradient(circle, rgba(99, 102, 241, 0.24) 0%, rgba(0, 136, 255, 0.10) 50%, transparent 75%)',
+          background: 'radial-gradient(circle, rgba(99, 102, 241, 0.16) 0%, rgba(0, 136, 255, 0.06) 50%, transparent 75%)',
           filter: 'blur(85px)',
-          animationDuration: '9s',
+          opacity: 0.18,
+          animationDuration: '13s',
         }}
       />
 
-      {/* ── CRISP FULLSCREEN CANVAS ───────────────────────────────────── */}
+      {/* ── FULLSCREEN CANVAS ───────────────────────────────────────── */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
 
-      {/* ── VIGNETTE GRADIENT ─────────────────────────────────────────── */}
+      {/* ── VIGNETTE GRADIENT ───────────────────────────────────────── */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_45%,_rgba(5,8,17,0.85)_100%)] pointer-events-none" />
     </motion.div>
   )

@@ -10,10 +10,8 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/admin': 'Overview',
   '/admin/models': 'AI Models',
   '/admin/datasets': 'Knowledge Base',
-  '/admin/users': 'Team Access',
+  '/admin/users': 'Users',
   '/admin/monitoring': 'Monitoring',
-  '/admin/system-health': 'Monitoring',
-  '/admin/logs': 'Monitoring',
   '/admin/settings': 'Settings',
 }
 

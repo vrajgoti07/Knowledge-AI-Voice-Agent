@@ -27,10 +27,10 @@ const USER_NAV_ITEMS: NavItemDef[] = [
 
 const ADMIN_NAV_ITEMS: NavItemDef[] = [
   { label: 'Overview', href: ROUTES.ADMIN, icon: LayoutDashboard },
-  { label: 'AI Models', href: '/admin/models', icon: Cpu },
-  { label: 'Knowledge Base', href: '/admin/datasets', icon: Database },
-  { label: 'Team Access', href: ROUTES.ADMIN_USERS, icon: Users },
-  { label: 'Monitoring', href: '/admin/monitoring', icon: Activity },
+  { label: 'AI Models', href: ROUTES.ADMIN_MODELS, icon: Cpu },
+  { label: 'Knowledge Base', href: ROUTES.ADMIN_DATASETS, icon: Database },
+  { label: 'Users', href: ROUTES.ADMIN_USERS, icon: Users },
+  { label: 'Monitoring', href: ROUTES.ADMIN_MONITORING, icon: Activity },
   { label: 'Settings', href: ROUTES.ADMIN_SETTINGS, icon: Settings },
 ]
 
