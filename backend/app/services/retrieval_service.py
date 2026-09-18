@@ -27,8 +27,8 @@ RERANK_MIN_SCORE: float = 0.20
 RERANK_MIN_SCORE_BM25_ONLY: float = 0.15  # Lower threshold when Qdrant is offline
 QDRANT_CANDIDATE_K: int = 30  # Increased from 20 for better cross-PDF coverage
 FINAL_TOP_K: int = 8
-MAX_CHUNKS_PER_DOC: int = 3
-MIN_DOCS_IN_RESULT: int = 2  # Try to include at least 2 different PDFs
+MAX_CHUNKS_PER_DOC: int = 5
+MIN_DOCS_IN_RESULT: int = 1  # Only return the user-demanded/relevant PDF(s), do not force multi-PDFs
 DEBUG_LOG_TOP_N: int = 10
 
 
@@ -271,52 +271,54 @@ def apply_diversity_cap(
     min_docs: int = MIN_DOCS_IN_RESULT,
 ) -> List[Dict[str, Any]]:
     """
-    Applies per-document diversity cap: selects top candidate chunks such that
-    no single document contributes more than `max_per_doc` chunks (default 3) to top_k (default 8).
-    Also ensures we pull from at least `min_docs` different PDFs when available.
+    Selects top candidate chunks prioritizing the primary document that matches the query.
+    Strictly avoids pulling unrelated documents into the user's topic-specific answer.
     """
     if not chunks:
         return []
 
-    # Count unique documents available
-    available_doc_ids = set(c.get("document_id") or "unknown" for c in chunks)
-    num_available_docs = len(available_doc_ids)
+    # Identify the primary matching document from top candidate chunk
+    top_doc_id = chunks[0].get("document_id")
+    top_score = chunks[0].get("score") or chunks[0].get("rerank_score") or 0.0
 
-    # If we have enough docs, adaptively lower max_per_doc to ensure diversity
-    effective_max = max_per_doc
-    if num_available_docs >= min_docs and top_k >= min_docs * 2:
-        # e.g., if 4 PDFs available and top_k=8, allow at most 3 per doc
-        effective_max = min(max_per_doc, max(2, top_k // min(num_available_docs, 4)))
-
-    doc_counts: Dict[str, int] = {}
     selected: List[Dict[str, Any]] = []
+    doc_counts: Dict[str, int] = {}
 
-    # First pass: pick top chunks respecting per-doc cap
+    # First pass: collect chunks from the primary matching document (up to max_per_doc)
     for chunk in chunks:
         doc_id = chunk.get("document_id") or "unknown"
-        current_count = doc_counts.get(doc_id, 0)
-        if current_count < effective_max:
-            selected.append(chunk)
-            doc_counts[doc_id] = current_count + 1
-            if len(selected) >= top_k:
-                break
-
-    # Second pass: if we only got chunks from 1 doc but more docs are available,
-    # force-include top chunk from other docs for cross-PDF coverage
-    if len(doc_counts) < min(min_docs, num_available_docs) and len(selected) < top_k:
-        included_docs = set(doc_counts.keys())
-        for chunk in chunks:
-            doc_id = chunk.get("document_id") or "unknown"
-            if doc_id not in included_docs:
+        if doc_id == top_doc_id:
+            if doc_counts.get(doc_id, 0) < max_per_doc:
                 selected.append(chunk)
-                doc_counts[doc_id] = 1
-                included_docs.add(doc_id)
-                if len(selected) >= top_k or len(included_docs) >= min_docs:
+                doc_counts[doc_id] = doc_counts.get(doc_id, 0) + 1
+                if len(selected) >= top_k:
+                    break
+
+    # Second pass: only allow other documents if their score is within 85% of the primary document
+    # and at least 0.40 to prevent pulling unrelated background files
+    if len(selected) < top_k:
+        for chunk in chunks:
+            if chunk not in selected:
+                doc_id = chunk.get("document_id") or "unknown"
+                item_score = chunk.get("score") or chunk.get("rerank_score") or 0.0
+                if top_score > 0 and item_score >= top_score * 0.85 and item_score >= 0.40:
+                    if doc_counts.get(doc_id, 0) < max_per_doc:
+                        selected.append(chunk)
+                        doc_counts[doc_id] = doc_counts.get(doc_id, 0) + 1
+                        if len(selected) >= top_k:
+                            break
+
+    # If still not enough, only take remaining chunks if they belong to top_doc_id
+    if len(selected) < top_k:
+        for chunk in chunks:
+            if chunk not in selected and (chunk.get("document_id") or "unknown") == top_doc_id:
+                selected.append(chunk)
+                if len(selected) >= top_k:
                     break
 
     logger.info(
         f"[DiversityCap] Selected {len(selected)} chunks across {len(doc_counts)} documents "
-        f"(max {effective_max} per doc, target top_k={top_k}, available_docs={num_available_docs})"
+        f"(primary_doc={top_doc_id}, top_score={top_score:.4f})"
     )
     return selected
 
@@ -388,6 +390,7 @@ def rerank_chunks(
 
             scored.append({
                 **c,
+                "score": final_score,
                 "rerank_score": final_score,
                 "_raw_rerank_score": round(raw_f, 4),
             })

@@ -7,7 +7,7 @@ import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { Sparkles, Copy, Check, Volume2, VolumeX } from 'lucide-react'
 import { DocumentSourcesList, InlineCitationChip, type Citation } from './CitationBadges'
-import { PdfViewerPanel } from '../documents/PdfViewerPanel'
+import { PDFViewerPanel } from './PDFViewerPanel'
 
 export interface Message {
   id: string
@@ -45,16 +45,31 @@ export function ChatMessageBubble({ message, index }: Props) {
   const cleanContent = sanitizeText(message.content)
   const textToSpeak = message.speechText ? message.speechText : cleanContent
 
+  // Filter citations strictly to the main query-related PDF
+  const mainCitations = React.useMemo(() => {
+    if (!message.citations || message.citations.length === 0) return []
+    const sorted = [...message.citations].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    const primaryDocKey = sorted[0]?.documentId || sorted[0]?.documentTitle
+    const primaryScore = sorted[0]?.score ?? 0
+    const normPrimary = primaryScore <= 1 ? primaryScore : primaryScore / 100
+
+    return sorted.filter(c => {
+      const docKey = c.documentId || c.documentTitle
+      if (docKey === primaryDocKey) return true
+      const itemScore = c.score ?? 0
+      const normItem = itemScore <= 1 ? itemScore : itemScore / 100
+      return normPrimary >= 0.50 && normItem >= Math.max(0.50, normPrimary * 0.90)
+    })
+  }, [message.citations])
+
   // Build citation map for quick lookup by index
   const citationMap = React.useMemo(() => {
     const map = new Map<number, Citation>()
-    if (message.citations) {
-      message.citations.forEach((c, idx) => {
-        map.set(idx + 1, c)
-      })
-    }
+    mainCitations.forEach((c, idx) => {
+      map.set(idx + 1, c)
+    })
     return map
-  }, [message.citations])
+  }, [mainCitations])
 
   const handleOpenPdf = (cit: Citation) => {
     setActiveViewerCitation(cit)
@@ -340,22 +355,22 @@ export function ChatMessageBubble({ message, index }: Props) {
           </div>
 
           {/* Document Sources & Citations Component */}
-          {message.citations && message.citations.length > 0 && (
+          {mainCitations.length > 0 && (
             <DocumentSourcesList
-              citations={message.citations}
+              citations={mainCitations}
               onOpenPdf={handleOpenPdf}
             />
           )}
 
           {/* In-app PDF Viewer Slide-over Panel / Modal */}
           {activeViewerCitation && (
-            <PdfViewerPanel
+            <PDFViewerPanel
               isOpen={Boolean(activeViewerCitation)}
               onClose={() => setActiveViewerCitation(null)}
               documentId={activeViewerCitation.documentId || ''}
               documentTitle={activeViewerCitation.documentTitle || 'Document'}
-              initialPage={activeViewerCitation.page || 1}
-              highlightText={activeViewerCitation.excerpt || ''}
+              initialPage={activeViewerCitation.page}
+              highlightExcerpt={activeViewerCitation.excerpt || ''}
               score={activeViewerCitation.score}
             />
           )}

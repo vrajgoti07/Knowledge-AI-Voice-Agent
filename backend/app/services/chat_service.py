@@ -192,16 +192,39 @@ def _generate_rag_response_core(
     zero_chunk_mode = len(retrieved_chunks) == 0
 
     # Build citations from retrieved chunks (independent of LLM provider)
+    # Build citations strictly from the user query's main relevant PDF
     citations_data = []
-    for idx, item in enumerate(retrieved_chunks, start=1):
-        citations_data.append({
-            "document_id": item["document_id"],
-            "document_title": item["document_title"],
-            "excerpt": item["content"][:200] + "..." if len(item["content"]) > 200 else item["content"],
-            "page": item["page"],
-            "chunk": item["chunk_index"],
-            "score": item["score"]
-        })
+    if retrieved_chunks:
+        top_chunk = retrieved_chunks[0]
+        top_doc_id = top_chunk.get("document_id")
+        max_score = max((item.get("score") or 0) for item in retrieved_chunks)
+
+        for idx, item in enumerate(retrieved_chunks, start=1):
+            item_score = item.get("score") or 0
+            item_doc_id = item.get("document_id")
+
+            # Include pages from the primary document answering user query
+            if item_doc_id == top_doc_id:
+                if item_score >= max_score * 0.50:
+                    citations_data.append({
+                        "document_id": item["document_id"],
+                        "document_title": item["document_title"],
+                        "excerpt": item["content"][:200] + "..." if len(item["content"]) > 200 else item["content"],
+                        "page": item["page"],
+                        "chunk": item["chunk_index"],
+                        "score": item_score
+                    })
+            else:
+                # Only permit a secondary document if its relevance is exceptionally high (>= 90% of top and >= 0.50)
+                if max_score >= 0.50 and item_score >= max_score * 0.90:
+                    citations_data.append({
+                        "document_id": item["document_id"],
+                        "document_title": item["document_title"],
+                        "excerpt": item["content"][:200] + "..." if len(item["content"]) > 200 else item["content"],
+                        "page": item["page"],
+                        "chunk": item["chunk_index"],
+                        "score": item_score
+                    })
 
     t2 = time.time()
     logger.info(f"[RAG Timing] Stage 2 (Citation Assembly) took {t2 - t1:.2f}s")
