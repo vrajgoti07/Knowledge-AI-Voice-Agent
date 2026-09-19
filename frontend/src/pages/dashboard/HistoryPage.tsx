@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Search, Sparkles, MessageSquare, ExternalLink, Clock } from 'lucide-react'
+import { Search, Sparkles, MessageSquare, ExternalLink, Clock, Layers } from 'lucide-react'
 import { Input } from '@/components/ui'
 import { apiGet } from '@/services/api'
 
@@ -26,6 +26,7 @@ interface ConversationItem {
   id: string
   title: string
   createdAt: string
+  documentIds?: string[]
   messages: DialogueMessage[]
 }
 
@@ -130,9 +131,28 @@ export default function HistoryPage() {
                   <p className="text-xs font-bold text-[#F1F5F9] truncate" title={thread.title}>
                     {thread.title}
                   </p>
-                  <p className="text-[10px] text-[#64748B] font-mono">
-                    {new Date(thread.createdAt).toLocaleDateString()} • {thread.messages?.length || 0} messages
-                  </p>
+                  <div className="flex items-center gap-1.5 text-[10px] text-[#64748B] font-mono flex-wrap">
+                    <span>{new Date(thread.createdAt).toLocaleDateString()}</span>
+                    <span>•</span>
+                    <span>{thread.messages?.length || 0} msgs</span>
+                    {thread.documentIds && thread.documentIds.length > 1 && (
+                      <>
+                        <span>•</span>
+                        <span className="inline-flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                          <Layers className="w-2.5 h-2.5 text-sky-400" />
+                          <span>{thread.documentIds.length} docs</span>
+                        </span>
+                      </>
+                    )}
+                    {thread.documentIds && thread.documentIds.length === 1 && (
+                      <>
+                        <span>•</span>
+                        <span className="inline-flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded bg-white/5 text-slate-400 border border-white/10">
+                          <span>1 doc</span>
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               ))
             )}
@@ -144,7 +164,15 @@ export default function HistoryPage() {
               <div className="space-y-6">
                 <div className="pb-4 border-b border-[#1E293B] flex items-center justify-between flex-wrap gap-3">
                   <div>
-                    <h3 className="text-base font-bold text-[#F1F5F9]">{activeThread.title}</h3>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h3 className="text-base font-bold text-[#F1F5F9]">{activeThread.title}</h3>
+                      {activeThread.documentIds && activeThread.documentIds.length > 1 && (
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                          <Layers className="w-3 h-3 text-sky-400" />
+                          <span>{activeThread.documentIds.length} Documents Scoped</span>
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[10px] text-[#64748B] font-mono mt-0.5">Session ID: {activeThread.id}</p>
                   </div>
 

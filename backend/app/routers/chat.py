@@ -1,7 +1,9 @@
 import logging
 import uuid
 import asyncio
+import io
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
@@ -14,6 +16,7 @@ from app.schemas.chat import ConversationResponse, MessageResponse, CitationResp
 from app.core.deps import get_current_user
 from app.services.chat_service import generate_rag_response
 from app.services.llm_provider import generate_conversation_summary
+from app.services.export_service import generate_conversation_pdf, slugify
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +166,52 @@ def get_conversation(
         running_summary=getattr(conv, 'running_summary', None),
     )
 
+@router.get("/{conversation_id}/export")
+def export_conversation(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Verify ownership
+    conv = db.query(Conversation).filter(
+        Conversation.id == conversation_id,
+        Conversation.user_id == current_user.id
+    ).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Fetch ordered messages
+    msgs = db.query(Message).filter(
+        Message.conversation_id == conv.id
+    ).order_by(Message.created_at.asc()).all()
+
+    # Fetch citations mapped per message
+    citations_map = {}
+    for m in msgs:
+        cits = db.query(Citation).filter(Citation.message_id == m.id).all()
+        citations_map[m.id] = cits
+
+    try:
+        pdf_bytes = generate_conversation_pdf(
+            conversation=conv,
+            messages=msgs,
+            citations_map=citations_map,
+        )
+    except Exception as err:
+        logger.error(f"Failed to generate conversation PDF: {err}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to generate conversation PDF export.")
+
+    filename = f"{slugify(conv.title)}.pdf"
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        }
+    )
+
 @router.delete("/{conversation_id}")
 def delete_conversation(
     conversation_id: str,
@@ -236,6 +285,12 @@ async def post_message(
         conv.title = user_content[:40] + "..." if len(user_content) > 40 else user_content
 
     # 4. Generate RAG response with conversation history & running summary
+    effective_context_doc_ids = (
+        req.context_document_ids
+        if req.context_document_ids is not None
+        else (conv.document_ids or None)
+    )
+
     try:
         answer_text, citations_list, rag_metadata = await asyncio.to_thread(
             generate_rag_response,
@@ -243,7 +298,7 @@ async def post_message(
             current_user.id,
             conv.id,
             user_content,
-            req.context_document_ids,
+            effective_context_doc_ids,
             recent_messages,
             getattr(conv, 'running_summary', None),
         )

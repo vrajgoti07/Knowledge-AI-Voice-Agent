@@ -269,13 +269,51 @@ def apply_diversity_cap(
     max_per_doc: int = MAX_CHUNKS_PER_DOC,
     top_k: int = FINAL_TOP_K,
     min_docs: int = MIN_DOCS_IN_RESULT,
+    context_document_ids: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Selects top candidate chunks prioritizing the primary document that matches the query.
-    Strictly avoids pulling unrelated documents into the user's topic-specific answer.
+    Selects top candidate chunks prioritizing relevance while enforcing document diversity.
+    When multiple documents are explicitly in scope (context_document_ids has >= 2 IDs),
+    ensures a balanced spread across the selected documents (no single document exceeds ~60% of top_k).
+    When in open/single-document mode, focuses on the primary matching document to prevent unrelated
+    background files from diluting the answer.
     """
     if not chunks:
         return []
+
+    is_multi_doc = bool(context_document_ids and len(context_document_ids) > 1)
+
+    if is_multi_doc:
+        # Multi-document mode: cap any single document to at most 60% of top_k (e.g. max 4 chunks when top_k=8)
+        # to ensure healthy cross-document representation.
+        cap_per_doc = max(2, int(top_k * 0.60))
+        selected: List[Dict[str, Any]] = []
+        doc_counts: Dict[str, int] = {}
+
+        # First pass: Greedily pick highest-scoring chunks respecting cap_per_doc
+        for chunk in chunks:
+            doc_id = chunk.get("document_id") or "unknown"
+            if doc_counts.get(doc_id, 0) < cap_per_doc:
+                selected.append(chunk)
+                doc_counts[doc_id] = doc_counts.get(doc_id, 0) + 1
+                if len(selected) >= top_k:
+                    break
+
+        # Second pass: If still under top_k (e.g. one doc had only 1 chunk), fill with remaining chunks
+        if len(selected) < top_k:
+            for chunk in chunks:
+                if chunk not in selected:
+                    selected.append(chunk)
+                    doc_id = chunk.get("document_id") or "unknown"
+                    doc_counts[doc_id] = doc_counts.get(doc_id, 0) + 1
+                    if len(selected) >= top_k:
+                        break
+
+        logger.info(
+            f"[DiversityCap:MultiDoc] Selected {len(selected)} chunks across {len(doc_counts)} documents "
+            f"(cap_per_doc={cap_per_doc}, docs={list(doc_counts.keys())})"
+        )
+        return selected
 
     # Identify the primary matching document from top candidate chunk
     top_doc_id = chunks[0].get("document_id")
@@ -329,6 +367,7 @@ def rerank_chunks(
     top_k: int = FINAL_TOP_K,
     min_score: float = RERANK_MIN_SCORE,
     max_per_doc: int = MAX_CHUNKS_PER_DOC,
+    context_document_ids: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     if not candidates:
         return []
@@ -344,7 +383,7 @@ def rerank_chunks(
     cross_enc = get_cross_encoder()
     if cross_enc is None:
         filtered = [c for c in valid_candidates if c.get("score", 0) >= min_score]
-        return apply_diversity_cap(filtered, max_per_doc=max_per_doc, top_k=top_k)
+        return apply_diversity_cap(filtered, max_per_doc=max_per_doc, top_k=top_k, context_document_ids=context_document_ids)
 
     try:
         import math
@@ -421,14 +460,14 @@ def rerank_chunks(
                 f"[Rerank] SOFT FALLBACK: All {len(scored)} candidates scored below {min_score}. "
                 f"Best: rerank_norm={best.get('rerank_score', 0):.4f}. Returning top {len(soft_top)} for LLM/fallback."
             )
-            return apply_diversity_cap(soft_top, max_per_doc=max_per_doc, top_k=top_k)
+            return apply_diversity_cap(soft_top, max_per_doc=max_per_doc, top_k=top_k, context_document_ids=context_document_ids)
 
-        return apply_diversity_cap(filtered, max_per_doc=max_per_doc, top_k=top_k)
+        return apply_diversity_cap(filtered, max_per_doc=max_per_doc, top_k=top_k, context_document_ids=context_document_ids)
 
     except Exception as e:
         logger.error(f"[Rerank] Prediction failed: {e}. Falling back to cosine.")
         filtered = [c for c in valid_candidates if c.get("score", 0) >= min_score]
-        return apply_diversity_cap(filtered, max_per_doc=max_per_doc, top_k=top_k)
+        return apply_diversity_cap(filtered, max_per_doc=max_per_doc, top_k=top_k, context_document_ids=context_document_ids)
 
 
 def is_boilerplate_text(content: str, page_number: int) -> bool:
@@ -754,6 +793,7 @@ def search_relevant_chunks(
         candidates=candidates,
         top_k=top_k,
         min_score=effective_min_score,
+        context_document_ids=context_document_ids,
     )
 
     t2 = time.time()

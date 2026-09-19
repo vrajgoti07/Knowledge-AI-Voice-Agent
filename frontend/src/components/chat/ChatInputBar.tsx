@@ -6,9 +6,11 @@
 // ============================================================
 import { useState, useRef, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Send, Mic, MicOff, Paperclip, X, FileText, Search, CheckCircle2, Loader2 } from 'lucide-react'
+import { Send, Mic, MicOff, Paperclip, X, FileText, Search, CheckCircle2, Loader2, Layers } from 'lucide-react'
 import { apiGet, apiPostFormData } from '@/services/api'
 import { toast } from '@/store/uiStore'
+
+import { MultiDocPickerModal } from './MultiDocPickerModal'
 
 export interface ContextDoc {
   id: string
@@ -24,115 +26,7 @@ interface Props {
   contextFiles?: ContextDoc[]
   onAddContext?: (doc: ContextDoc) => void
   onRemoveContext?: (id: string) => void
-}
-
-function InlinePickerModal({
-  onSelect,
-  onClose,
-  already,
-}: {
-  onSelect: (doc: ContextDoc) => void
-  onClose: () => void
-  already: string[]
-}) {
-  const [docs, setDocs] = useState<ContextDoc[]>([])
-  const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  const fetchDocs = async (q: string) => {
-    setLoading(true)
-    try {
-      const all = await apiGet<ContextDoc[]>('/documents?scope=all')
-      setDocs(
-        all.filter(
-          d =>
-            d.status === 'ready' &&
-            d.title.toLowerCase().includes(q.toLowerCase())
-        )
-      )
-    } catch { /* empty */ } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchDocs('')
-  }, [])
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-md bg-[#121A2C] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
-      >
-        <div className="p-4 border-b border-white/10 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Paperclip className="w-4 h-4 text-sky-400" />
-            <h3 className="text-sm font-semibold text-white">Attach Context Document</h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close picker"
-            className="text-slate-400 hover:text-white cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="p-4 space-y-3">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#0A0E1A] border border-white/10">
-            <Search className="w-4 h-4 text-slate-500 shrink-0" />
-            <input
-              type="text"
-              placeholder="Search indexed documents..."
-              value={search}
-              onChange={e => { setSearch(e.target.value); fetchDocs(e.target.value) }}
-              className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none"
-            />
-          </div>
-
-          <div className="max-h-64 overflow-y-auto space-y-1.5">
-            {loading ? (
-              <div className="space-y-2 p-2">
-                {[1,2,3].map(i => <div key={i} className="h-10 bg-white/5 rounded-lg animate-pulse" />)}
-              </div>
-            ) : docs.length === 0 ? (
-              <div className="text-center py-6">
-                <p className="text-xs text-slate-500">No ready documents found</p>
-              </div>
-            ) : (
-              docs.map(doc => {
-                const isAdded = already.includes(doc.id)
-                return (
-                  <button
-                    key={doc.id}
-                    type="button"
-                    disabled={isAdded}
-                    onClick={() => { onSelect(doc); onClose() }}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${
-                      isAdded
-                        ? 'opacity-50 cursor-not-allowed bg-white/5'
-                        : 'hover:bg-white/[0.04] cursor-pointer'
-                    }`}
-                  >
-                    <FileText className="w-4 h-4 text-sky-400 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-white truncate">{doc.title}</p>
-                      <p className="text-[10px] text-slate-400">{doc.chunks} chunks · {doc.fileType}</p>
-                    </div>
-                    {isAdded && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
-                  </button>
-                )
-              })
-            )}
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  )
+  onUpdateContext?: (docs: ContextDoc[]) => void
 }
 
 export function ChatInputBar({
@@ -141,6 +35,7 @@ export function ChatInputBar({
   contextFiles = [],
   onAddContext,
   onRemoveContext,
+  onUpdateContext,
 }: Props) {
   const [text, setText] = useState('')
   const [recording, setRecording] = useState(false)
@@ -322,59 +217,115 @@ export function ChatInputBar({
       />
 
       {/* Floating frosted-glass input box pill */}
-      <div className="bg-[#121A2C]/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-3 shadow-2xl space-y-2 transition-all focus-within:border-sky-500/60 focus-within:ring-1 focus-within:ring-sky-500/30">
+      <div className="bg-[#121A2C]/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-3 shadow-2xl space-y-2.5 transition-all focus-within:border-sky-500/60 focus-within:ring-1 focus-within:ring-sky-500/30">
 
-        {/* Attached Context Files Pills Row */}
-        {contextFiles.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 pb-2 border-b border-white/[0.06]">
-            <span className="text-[10px] font-mono text-slate-400 font-semibold uppercase tracking-wider mr-1">
-              Context Files ({contextFiles.length}):
-            </span>
-            {contextFiles.map(doc => (
-              <div
-                key={doc.id}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium shadow-xs border transition-colors ${
-                  doc.status === 'ready'
-                    ? 'bg-sky-500/10 border-sky-500/30 text-sky-300'
-                    : doc.status === 'error'
-                    ? 'bg-red-500/10 border-red-500/30 text-red-300'
-                    : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                }`}
+        {/* Multi-Document Scope Status & Pills */}
+        {contextFiles.length > 0 ? (
+          <div className="space-y-2 pb-2 border-b border-white/[0.06]">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-400 border border-sky-500/30 text-xs font-semibold cursor-pointer transition-all shadow-xs active:scale-95 group"
+                title="Click to edit selected documents"
               >
-                {doc.status === 'ready' ? (
-                  <FileText className="w-3.5 h-3.5 shrink-0" />
-                ) : doc.status === 'error' ? (
-                  <FileText className="w-3.5 h-3.5 shrink-0 text-red-400" />
-                ) : (
-                  <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
-                )}
-                <span className="max-w-[160px] truncate">{doc.title}</span>
-                {(doc.status === 'uploading' || doc.status === 'processing') && (
-                  <span className="text-[9px] font-mono opacity-70">indexing…</span>
-                )}
-                <button
-                  type="button"
-                  aria-label={`Remove ${doc.title}`}
-                  onClick={() => onRemoveContext?.(doc.id)}
-                  className="hover:text-red-400 cursor-pointer ml-0.5"
+                <Layers className="w-3.5 h-3.5 text-sky-400 group-hover:scale-110 transition-transform" />
+                <span>
+                  Chatting with {contextFiles.length} {contextFiles.length === 1 ? 'document' : 'documents'} ▾
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (onUpdateContext) {
+                    onUpdateContext([])
+                  } else {
+                    contextFiles.forEach(f => onRemoveContext?.(f.id))
+                  }
+                }}
+                className="text-[10px] text-slate-400 hover:text-red-400 font-mono transition-colors cursor-pointer"
+              >
+                Clear all
+              </button>
+            </div>
+
+            {/* Document Pills */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {contextFiles.map(doc => (
+                <div
+                  key={doc.id}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium shadow-xs border transition-colors ${
+                    doc.status === 'ready'
+                      ? 'bg-sky-500/10 border-sky-500/30 text-sky-300'
+                      : doc.status === 'error'
+                      ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                      : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                  }`}
                 >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
+                  {doc.status === 'ready' ? (
+                    <FileText className="w-3.5 h-3.5 shrink-0 text-sky-400" />
+                  ) : doc.status === 'error' ? (
+                    <FileText className="w-3.5 h-3.5 shrink-0 text-red-400" />
+                  ) : (
+                    <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
+                  )}
+                  <span className="max-w-[160px] truncate">{doc.title}</span>
+                  {(doc.status === 'uploading' || doc.status === 'processing') && (
+                    <span className="text-[9px] font-mono opacity-70">indexing…</span>
+                  )}
+                  <button
+                    type="button"
+                    aria-label={`Remove ${doc.title}`}
+                    onClick={() => onRemoveContext?.(doc.id)}
+                    className="hover:text-red-400 cursor-pointer ml-0.5 opacity-70 hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/[0.02] hover:bg-white/[0.06] text-slate-400 hover:text-sky-300 border border-white/5 hover:border-sky-500/30 text-[11px] font-medium cursor-pointer transition-all"
+            >
+              <Layers className="w-3.5 h-3.5 text-sky-400/80" />
+              <span>Scope chat to specific documents (Multi-Select) ▾</span>
+            </button>
+            <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">Searching entire library</span>
           </div>
         )}
 
         {/* Main Controls Row */}
         <div className="flex items-end gap-2">
-          {/* Paperclip attachment button */}
+          {/* Multi-document library picker trigger button */}
           <button
             type="button"
-            aria-label="Attach document file"
+            aria-label="Select context documents from library"
+            onClick={() => setPickerOpen(true)}
+            disabled={isDisabled}
+            title="Select context documents from library (Multi-Doc RAG)"
+            className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+              contextFiles.length > 0
+                ? 'bg-sky-500/15 border-sky-500/40 text-sky-400 hover:bg-sky-500/25'
+                : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-sky-400 hover:border-sky-500/30'
+            } disabled:opacity-40 shadow-xs`}
+          >
+            <Layers className="w-4 h-4" />
+          </button>
+
+          {/* Paperclip upload attachment button */}
+          <button
+            type="button"
+            aria-label="Upload document file"
             onClick={() => fileInputRef.current?.click()}
             disabled={isDisabled || uploading}
             title="Upload & attach local document file"
-            className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border bg-white/[0.04] border-white/10 text-slate-400 hover:text-sky-400 hover:border-sky-500/30 disabled:opacity-40"
+            className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border bg-white/[0.04] border-white/10 text-slate-400 hover:text-sky-400 hover:border-sky-500/30 disabled:opacity-40 shadow-xs"
           >
             {uploading ? <Loader2 className="w-4 h-4 animate-spin text-sky-400" /> : <Paperclip className="w-4 h-4" />}
           </button>
@@ -400,7 +351,13 @@ export function ChatInputBar({
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask anything about your documents... (Enter to send, Shift+Enter for newline)"
+            placeholder={
+              contextFiles.length > 1
+                ? `Ask questions comparing or synthesizing ${contextFiles.length} selected documents...`
+                : contextFiles.length === 1
+                ? `Ask anything about ${contextFiles[0].title}...`
+                : "Ask anything about your documents... (Enter to send, Shift+Enter for newline)"
+            }
             disabled={isDisabled}
             rows={1}
             aria-label="Chat message input"
@@ -425,16 +382,19 @@ export function ChatInputBar({
         </div>
       </div>
 
-      {/* Document Picker Modal */}
-      <AnimatePresence>
-        {pickerOpen && onAddContext && (
-          <InlinePickerModal
-            onSelect={onAddContext}
-            onClose={() => setPickerOpen(false)}
-            already={contextFiles.map(f => f.id)}
-          />
-        )}
-      </AnimatePresence>
+      {/* Multi-Document Picker Modal */}
+      <MultiDocPickerModal
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        selectedDocs={contextFiles}
+        onApply={(selectedDocs) => {
+          if (onUpdateContext) {
+            onUpdateContext(selectedDocs)
+          } else {
+            selectedDocs.forEach(d => onAddContext?.(d))
+          }
+        }}
+      />
     </>
   )
 }

@@ -45,9 +45,14 @@ export function ChatMessageBubble({ message, index }: Props) {
   const cleanContent = sanitizeText(message.content)
   const textToSpeak = message.speechText ? message.speechText : cleanContent
 
-  // Filter citations strictly to the main query-related PDF
+  // Filter citations: show all citations when multiple documents are cited;
+  // otherwise apply primary-document focus to protect single-doc queries
   const mainCitations = React.useMemo(() => {
     if (!message.citations || message.citations.length === 0) return []
+    const distinctDocs = new Set(message.citations.map(c => c.documentId || c.documentTitle))
+    if (distinctDocs.size > 1) {
+      return [...message.citations].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    }
     const sorted = [...message.citations].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
     const primaryDocKey = sorted[0]?.documentId || sorted[0]?.documentTitle
     const primaryScore = sorted[0]?.score ?? 0

@@ -6,10 +6,13 @@
 
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus, Trash2, MessageSquare, Sparkles, PanelLeft, PanelLeftClose } from 'lucide-react'
+import { Plus, Trash2, MessageSquare, Sparkles, PanelLeft, PanelLeftClose, Download, Loader2, Layers } from 'lucide-react'
+import { toast } from 'sonner'
+import api from '@/services/api'
 import { useChatSession } from '@/hooks/useChatSession'
 import { ChatMessageList } from '@/components/chat/ChatMessageList'
 import { ChatInputBar } from '@/components/chat/ChatInputBar'
+import { ContextFilePanel } from '@/components/chat/ContextFilePanel'
 
 export default function ChatPage() {
   const { id: conversationId } = useParams<{ id: string }>()
@@ -21,14 +24,66 @@ export default function ChatPage() {
     messages,
     isThinking,
     contextFiles,
+    contextPanelOpen,
     loadingConvs,
+    setContextPanelOpen,
     createConversation,
     selectConversation,
     deleteConversation,
     sendMessage,
     addContextFile,
     removeContextFile,
+    updateContextFiles,
   } = useChatSession(conversationId)
+
+  const [isExporting, setIsExporting] = useState(false)
+
+  const handleExportPdf = async () => {
+    if (!activeId) return
+    try {
+      setIsExporting(true)
+      const res = await api.get(`/conversations/${activeId}/export`, {
+        responseType: 'blob',
+      })
+
+      // Extract filename from Content-Disposition header if available
+      let filename = 'conversation-export.pdf'
+      const disposition = res.headers['content-disposition']
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename=["']?([^"';]+)["']?/)
+        if (match && match[1]) {
+          filename = match[1]
+        }
+      } else {
+        const currentConv = conversations.find(c => c.id === activeId)
+        if (currentConv?.title) {
+          const slug = currentConv.title
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)/g, '')
+          filename = `${slug || 'conversation'}.pdf`
+        }
+      }
+
+      // Trigger browser download via object URL
+      const blob = new Blob([res.data], { type: 'application/pdf' })
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+
+      toast.success('Conversation exported to PDF successfully')
+    } catch (err: any) {
+      console.error('[ExportPDF] Error downloading conversation export:', err)
+      toast.error(err.response?.data?.detail || 'Failed to export conversation. Please try again.')
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   // Helper to reliably parse UTC ISO strings even if 'Z' suffix is omitted
   const parseUtcDate = (iso?: string) => {
@@ -67,32 +122,48 @@ export default function ChatPage() {
     return `${Math.floor(diff / 86400)}d ago`
   }
 
-  const renderConvItem = (conv: typeof conversations[0]) => (
-    <div
-      key={conv.id}
-      className={`group relative flex items-start gap-2 p-2.5 rounded-xl cursor-pointer transition-all ${
-        activeId === conv.id
-          ? 'bg-[#121A2C] border border-white/10'
-          : 'hover:bg-white/[0.03] border border-transparent'
-      }`}
-      onClick={() => selectConversation(conv.id)}
-    >
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold text-slate-200 truncate" title={conv.title}>
-          {conv.title || 'Untitled Thread'}
-        </p>
-        <p className="text-[10px] text-slate-500 font-mono mt-0.5">{relativeTime(conv.updatedAt)}</p>
-      </div>
-      <button
-        type="button"
-        aria-label={`Delete conversation ${conv.title}`}
-        onClick={e => { e.stopPropagation(); deleteConversation(conv.id) }}
-        className="shrink-0 opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all cursor-pointer p-1 rounded"
+  const renderConvItem = (conv: typeof conversations[0]) => {
+    const docCount = conv.documentIds?.length || 0
+    return (
+      <div
+        key={conv.id}
+        className={`group relative flex items-start gap-2 p-2.5 rounded-xl cursor-pointer transition-all ${
+          activeId === conv.id
+            ? 'bg-[#121A2C] border border-white/10'
+            : 'hover:bg-white/[0.03] border border-transparent'
+        }`}
+        onClick={() => selectConversation(conv.id)}
       >
-        <Trash2 className="w-3 h-3" />
-      </button>
-    </div>
-  )
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-slate-200 truncate" title={conv.title}>
+            {conv.title || 'Untitled Thread'}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-[10px] text-slate-500 font-mono">{relativeTime(conv.updatedAt)}</span>
+            {docCount > 1 && (
+              <span className="inline-flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded bg-sky-500/15 text-sky-300 border border-sky-500/25">
+                <Layers className="w-2.5 h-2.5 text-sky-400" />
+                <span>{docCount} docs</span>
+              </span>
+            )}
+            {docCount === 1 && (
+              <span className="inline-flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded bg-white/5 text-slate-400 border border-white/10">
+                <span>1 doc</span>
+              </span>
+            )}
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-label={`Delete conversation ${conv.title}`}
+          onClick={e => { e.stopPropagation(); deleteConversation(conv.id) }}
+          className="shrink-0 opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all cursor-pointer p-1 rounded"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-1 h-full w-full bg-[#0A0E1A] text-slate-200 overflow-hidden select-none font-sans relative">
@@ -171,25 +242,67 @@ export default function ChatPage() {
       {/* ── MAIN RIGHT COLUMN CONTAINER ───────────────────────────── */}
       <div className="flex flex-col h-full relative overflow-hidden bg-[#0A0E1A] flex-1 min-w-0">
 
-        {/* Minimalist Top Model Header with Sidebar Toggle */}
+        {/* Minimalist Top Model Header with Sidebar Toggle & Export PDF Button */}
         <header className="h-12 border-b border-white/[0.04] bg-[#0A0E1A] flex items-center justify-between px-4 shrink-0 z-10">
-          {!sidebarOpen && (
-            <button
-              type="button"
-              onClick={() => setSidebarOpen(true)}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer"
-              title="Expand sidebar"
-            >
-              <PanelLeft className="w-4 h-4" />
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {!sidebarOpen && (
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer"
+                title="Expand sidebar"
+              >
+                <PanelLeft className="w-4 h-4" />
+              </button>
+            )}
+          </div>
 
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mx-auto">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
             <Sparkles className="w-3.5 h-3.5 text-sky-400" />
             <span>Gemini 2.5 Flash</span>
           </div>
 
-          <div className="w-6" />
+          <div className="flex items-center gap-2">
+            {/* Toggle Context Files Sidebar */}
+            <button
+              type="button"
+              onClick={() => setContextPanelOpen(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95 ${
+                contextPanelOpen || contextFiles.length > 0
+                  ? 'bg-sky-500/15 border-sky-500/30 text-sky-300 hover:bg-sky-500/25'
+                  : 'bg-white/[0.04] border-white/10 text-slate-300 hover:text-white hover:bg-white/[0.08]'
+              }`}
+              title="Toggle Context Documents Inspector"
+            >
+              <Layers className="w-3.5 h-3.5 text-sky-400" />
+              <span className="hidden sm:inline">
+                {contextFiles.length > 0
+                  ? `${contextFiles.length} ${contextFiles.length === 1 ? 'Doc' : 'Docs'}`
+                  : 'Scope Docs'}
+              </span>
+            </button>
+
+            {activeId && messages.length > 0 ? (
+              <button
+                type="button"
+                onClick={handleExportPdf}
+                disabled={isExporting}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white border border-white/10 hover:border-sky-500/30 text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xs cursor-pointer active:scale-95"
+                title="Export conversation as formatted PDF with citations"
+              >
+                {isExporting ? (
+                  <Loader2 className="w-3.5 h-3.5 text-sky-400 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5 text-sky-400" />
+                )}
+                <span className="hidden sm:inline">
+                  {isExporting ? 'Exporting...' : 'Export PDF'}
+                </span>
+              </button>
+            ) : (
+              <div className="w-2" />
+            )}
+          </div>
         </header>
 
         {/* 1. SCROLLABLE MESSAGES AREA */}
@@ -210,11 +323,24 @@ export default function ChatPage() {
               contextFiles={contextFiles}
               onAddContext={addContextFile}
               onRemoveContext={removeContextFile}
+              onUpdateContext={updateContextFiles}
             />
           </div>
         </div>
 
       </div>
+
+      {/* ── RIGHT SIDEBAR: Context Files Inspector Panel ──────────── */}
+      {contextPanelOpen && (
+        <ContextFilePanel
+          contextFiles={contextFiles}
+          onAdd={addContextFile}
+          onRemove={removeContextFile}
+          onUpdateContext={updateContextFiles}
+          isOpen={contextPanelOpen}
+          onClose={() => setContextPanelOpen(false)}
+        />
+      )}
     </div>
   )
 }

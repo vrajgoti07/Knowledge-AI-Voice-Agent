@@ -254,6 +254,10 @@ export function useChatSession(conversationId?: string) {
     setContextFiles(prev => prev.filter(f => f.id !== id))
   }, [])
 
+  const updateContextFiles = useCallback((docs: ContextDoc[]) => {
+    setContextFiles(docs)
+  }, [])
+
   // ── Initial load ──────────────────────────────────────────
   useEffect(() => {
     loadConversations()
@@ -296,6 +300,7 @@ export function useChatSession(conversationId?: string) {
     sendMessage,
     addContextFile,
     removeContextFile,
+    updateContextFiles,
     loadConversations,
   }
 }

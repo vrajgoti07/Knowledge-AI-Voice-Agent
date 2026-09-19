@@ -51,7 +51,7 @@ export function InlineCitationChip({ num, citation, onOpenPdf }: InlineCitationP
           onClick={handleChipClick}
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
-          className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-sky-500/15 hover:bg-sky-500/30 text-sky-400 hover:text-sky-200 font-mono text-[11px] font-semibold align-baseline cursor-pointer select-none transition-all duration-200 border border-sky-500/30 hover:border-sky-400 hover:shadow-[0_0_12px_rgba(56,189,248,0.45)] group active:scale-95"
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-sky-500/15 hover:bg-sky-500/30 text-sky-400 hover:text-sky-200 font-mono text-[11px] font-semibold align-baseline cursor-pointer select-none transition-all duration-200 border border-sky-500/30 hover:border-sky-400 hover:shadow-[0_0_12px_rgba(56,189,248,0.45)] group active:scale-95"
           aria-label={`Source reference ${num}`}
           title={
             citation
@@ -59,7 +59,13 @@ export function InlineCitationChip({ num, citation, onOpenPdf }: InlineCitationP
               : `Source [${num}]`
           }
         >
-          [{num}]
+          <span>[{num}]</span>
+          {citation?.documentTitle && (
+            <span className="max-w-[130px] truncate text-[10px] text-slate-300 font-sans font-medium pl-1 border-l border-sky-500/30 hidden sm:inline">
+              {citation.documentTitle.replace(/\.pdf$/i, '')}
+              {citation.page ? ` (p.${citation.page})` : ''}
+            </span>
+          )}
         </button>
 
         {showTooltip && citation && (
@@ -99,23 +105,23 @@ export function InlineCitationChip({ num, citation, onOpenPdf }: InlineCitationP
                 className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition-colors cursor-pointer shadow-sm"
               >
                 <Eye className="w-3.5 h-3.5" />
-                <span>{citation.page ? `Inspect Cited Page ${citation.page}` : 'Inspect Evidence'}</span>
+                <span>Jump to Page in Document</span>
               </button>
             )}
           </div>
         )}
       </span>
 
-      {/* Local fallback viewer if not controlled by parent */}
+      {/* Fallback Standalone Modal PDF Viewer */}
       {localViewerOpen && citation && (
         <PDFViewerPanel
           isOpen={localViewerOpen}
-          onClose={() => setLocalViewerOpen(false)}
           documentId={citation.documentId || ''}
           documentTitle={citation.documentTitle || 'Document'}
-          initialPage={citation.page}
-          highlightExcerpt={citation.excerpt || ''}
+          initialPage={citation.page || 1}
+          highlightExcerpt={citation.excerpt}
           score={citation.score}
+          onClose={() => setLocalViewerOpen(false)}
         />
       )}
     </>
@@ -180,29 +186,30 @@ export function DocumentSourcesList({ citations, onOpenPdf }: DocumentSourcesLis
     }
   }
 
-  // 2. Strict Primary-Document Gating:
-  // Identify the #1 highest scoring primary document directly answering user demand
+  // 2. Multi-Document aware Gating:
+  // If citations span multiple documents, show all returned evidence.
+  // If only one document or single-doc query, protect against background file dilution.
   const sortedByScore = [...uniqueSources].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-  const primaryDoc = sortedByScore[0]
-  const primaryDocKey = primaryDoc ? (primaryDoc.documentId || primaryDoc.documentTitle) : null
+  const distinctDocs = new Set(uniqueSources.map(c => c.documentId || c.documentTitle))
+  const isMultiDoc = distinctDocs.size > 1
 
-  // Restrict citations ONLY to the main user-chat related PDF.
-  // Filter out any secondary/unrelated PDFs (e.g., Module 2 Math or Module 3 Preprocessing when query is Linear Regression)
-  const mainPdfSources = sortedByScore.filter(c => {
-    const docKey = c.documentId || c.documentTitle
-    // Always include all cited pages from the main relevant PDF
-    if (docKey === primaryDocKey) {
-      return true
-    }
-    // Only permit a secondary PDF if its relevance is exceptionally high (>= 90% of top and >= 50% absolute)
-    const topScore = primaryDoc?.score ?? 0
-    const currentScore = c.score ?? 0
-    const normTop = topScore <= 1 ? topScore : topScore / 100
-    const normCurrent = currentScore <= 1 ? currentScore : currentScore / 100
-    return normTop >= 0.50 && normCurrent >= Math.max(0.50, normTop * 0.90)
-  })
-
-  const sourcesToGroup = mainPdfSources.length > 0 ? mainPdfSources : sortedByScore
+  let sourcesToGroup: Citation[]
+  if (isMultiDoc) {
+    sourcesToGroup = sortedByScore
+  } else {
+    const primaryDoc = sortedByScore[0]
+    const primaryDocKey = primaryDoc ? (primaryDoc.documentId || primaryDoc.documentTitle) : null
+    const mainPdfSources = sortedByScore.filter(c => {
+      const docKey = c.documentId || c.documentTitle
+      if (docKey === primaryDocKey) return true
+      const topScore = primaryDoc?.score ?? 0
+      const currentScore = c.score ?? 0
+      const normTop = topScore <= 1 ? topScore : topScore / 100
+      const normCurrent = currentScore <= 1 ? currentScore : currentScore / 100
+      return normTop >= 0.50 && normCurrent >= Math.max(0.50, normTop * 0.90)
+    })
+    sourcesToGroup = mainPdfSources.length > 0 ? mainPdfSources : sortedByScore
+  }
 
   // 3. Group by Module/Document so multiple pages from the same module appear in ONE unified card
   const docGroupMap = new Map<string, GroupedSource>()

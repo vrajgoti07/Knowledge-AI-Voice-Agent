@@ -16,121 +16,18 @@ interface ContextDoc {
   status: string
 }
 
+import { MultiDocPickerModal } from './MultiDocPickerModal'
+
 interface Props {
   contextFiles: ContextDoc[]
   onAdd: (doc: ContextDoc) => void
   onRemove: (id: string) => void
+  onUpdateContext?: (docs: ContextDoc[]) => void
   isOpen?: boolean
   onClose?: () => void
 }
 
-function PickerModal({
-  onSelect,
-  onClose,
-  already,
-}: {
-  onSelect: (doc: ContextDoc) => void
-  onClose: () => void
-  already: string[]
-}) {
-  const [docs, setDocs] = useState<ContextDoc[]>([])
-  const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  const fetchDocs = async (q: string) => {
-    setLoading(true)
-    try {
-      const all = await apiGet<ContextDoc[]>('/documents?scope=all')
-      setDocs(
-        all.filter(
-          d =>
-            (d.status || '').toLowerCase() === 'ready' &&
-            d.title.toLowerCase().includes(q.toLowerCase())
-        )
-      )
-    } catch { /* empty */ } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchDocs('')
-  }, [])
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-md bg-[#121A2C] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
-      >
-        <div className="p-4 border-b border-white/10 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white">Select Context Document</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close picker"
-            className="text-slate-400 hover:text-white cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="p-4 space-y-3">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#0A0E1A] border border-white/10">
-            <Search className="w-4 h-4 text-slate-500 shrink-0" />
-            <input
-              type="text"
-              placeholder="Search indexed documents..."
-              value={search}
-              onChange={e => { setSearch(e.target.value); fetchDocs(e.target.value) }}
-              className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none"
-            />
-          </div>
-
-          <div className="max-h-64 overflow-y-auto space-y-1.5">
-            {loading ? (
-              <div className="space-y-2 p-2">
-                {[1,2,3].map(i => <div key={i} className="h-10 bg-white/5 rounded-lg animate-pulse" />)}
-              </div>
-            ) : docs.length === 0 ? (
-              <div className="text-center py-6">
-                <p className="text-xs text-slate-500">No ready documents found</p>
-              </div>
-            ) : (
-              docs.map(doc => {
-                const isAdded = already.includes(doc.id)
-                return (
-                  <button
-                    key={doc.id}
-                    type="button"
-                    disabled={isAdded}
-                    onClick={() => { onSelect(doc); onClose() }}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${
-                      isAdded
-                        ? 'opacity-50 cursor-not-allowed bg-white/5'
-                        : 'hover:bg-white/[0.04] cursor-pointer'
-                    }`}
-                  >
-                    <FileText className="w-4 h-4 text-sky-400 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-white truncate">{doc.title}</p>
-                      <p className="text-[10px] text-slate-400">{doc.chunks} chunks · {doc.fileType}</p>
-                    </div>
-                    {isAdded && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
-                  </button>
-                )
-              })
-            )}
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  )
-}
-
-export function ContextFilePanel({ contextFiles, onAdd, onRemove, isOpen = true, onClose }: Props) {
+export function ContextFilePanel({ contextFiles, onAdd, onRemove, onUpdateContext, isOpen = true, onClose }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false)
 
   const panelContent = (
@@ -237,15 +134,18 @@ export function ContextFilePanel({ contextFiles, onAdd, onRemove, isOpen = true,
       </AnimatePresence>
 
       {/* Document picker modal */}
-      <AnimatePresence>
-        {pickerOpen && (
-          <PickerModal
-            onSelect={onAdd}
-            onClose={() => setPickerOpen(false)}
-            already={contextFiles.map(f => f.id)}
-          />
-        )}
-      </AnimatePresence>
+      <MultiDocPickerModal
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        selectedDocs={contextFiles}
+        onApply={(docs) => {
+          if (onUpdateContext) {
+            onUpdateContext(docs)
+          } else {
+            docs.forEach(d => onAdd(d))
+          }
+        }}
+      />
     </>
   )
 }
