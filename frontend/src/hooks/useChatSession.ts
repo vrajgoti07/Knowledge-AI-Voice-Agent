@@ -35,6 +35,8 @@ interface BackendMessage {
   timestamp?: string
   model?: string
   error?: string
+  isComparison?: boolean
+  is_comparison?: boolean
 }
 
 interface BackendConversation {
@@ -47,6 +49,11 @@ interface BackendConversation {
 }
 
 function mapMessage(m: BackendMessage): Message {
+  const isComp = Boolean(
+    m.isComparison ||
+    m.is_comparison ||
+    (m.model && m.model.toLowerCase().includes('comparison'))
+  )
   return {
     id: m.id,
     role: m.role as 'user' | 'assistant' | 'system',
@@ -55,6 +62,7 @@ function mapMessage(m: BackendMessage): Message {
     timestamp: m.timestamp,
     model: m.model,
     error: m.error,
+    isComparison: isComp,
   }
 }
 
@@ -96,7 +104,7 @@ export function useChatSession(conversationId?: string) {
       setActiveId(id)
 
       if (data.documentIds && data.documentIds.length > 0) {
-        const allDocs = await apiGet<ContextDoc[]>('/documents')
+        const allDocs = await apiGet<ContextDoc[]>('/documents?scope=all')
         const ctx = allDocs.filter(d => data.documentIds.includes(d.id))
         setContextFiles(ctx)
       } else {
@@ -145,11 +153,15 @@ export function useChatSession(conversationId?: string) {
   }, [activeId, navigate])
 
   // ── Unified Send Message Handler (Strict try/catch/finally state management) ──
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (
+    content: string,
+    options?: { isCompare?: boolean; compareDocIds?: string[] }
+  ) => {
     const trimmed = content.trim()
     if (!trimmed) return
 
     isSendingRef.current = true
+    const isCompare = Boolean(options?.isCompare)
 
     // 1. Set optimistic UI and loading states
     const tempUserMsg: Message = {
@@ -157,6 +169,7 @@ export function useChatSession(conversationId?: string) {
       role: 'user',
       content: trimmed,
       timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      isComparison: isCompare,
     }
 
     setMessages(prev => [...prev, tempUserMsg])
@@ -173,15 +186,31 @@ export function useChatSession(conversationId?: string) {
         navigate(`/chat/${targetId}`, { replace: true })
       }
 
-      // 3. Post to backend LLM API
-      const payload: Record<string, unknown> = { content: trimmed }
-      // Only include READY documents — uploading/processing docs have no indexed chunks yet
-      const readyContextFiles = contextFiles.filter(f => f.status === 'ready' && f.chunks > 0)
-      if (readyContextFiles.length > 0) {
+      // 3. Post to backend LLM API (Compare vs Standard message)
+      let res: BackendMessage
+      if (isCompare) {
+        const readyContextFiles = contextFiles.filter(f => f.status === 'ready' && f.chunks > 0)
+        const docIds = options?.compareDocIds && options.compareDocIds.length >= 2
+          ? options.compareDocIds
+          : readyContextFiles.map(f => f.id)
+
+        if (docIds.length < 2) {
+          toast.error('Compare Mode Error', 'Please select at least 2 documents to compare.')
+          setMessages(prev => prev.filter(m => m.id !== tempUserMsg.id))
+          return
+        }
+
+        res = await apiPost<BackendMessage>(`/conversations/${targetId}/compare`, {
+          documentIds: docIds,
+          query: trimmed,
+        }, { timeout: 120_000 })
+      } else {
+        const payload: Record<string, unknown> = { content: trimmed }
+        const readyContextFiles = contextFiles.filter(f => f.status === 'ready' && f.chunks > 0)
         payload.contextDocumentIds = readyContextFiles.map(f => f.id)
+        res = await apiPost<BackendMessage>(`/conversations/${targetId}/messages`, payload, { timeout: 120_000 })
       }
 
-      const res = await apiPost<BackendMessage>(`/conversations/${targetId}/messages`, payload, { timeout: 120_000 })
       const aiMsg = mapMessage(res)
 
       // 4. Update messages with the AI response

@@ -15,6 +15,7 @@ import {
   Square,
   Sparkles,
   BookOpen,
+  GitCompare,
 } from 'lucide-react'
 import { apiGet } from '@/services/api'
 
@@ -31,9 +32,10 @@ interface Props {
   onClose: () => void
   selectedDocs: ContextDoc[]
   onApply: (docs: ContextDoc[]) => void
+  mode?: 'default' | 'compare'
 }
 
-export function MultiDocPickerModal({ isOpen, onClose, selectedDocs, onApply }: Props) {
+export function MultiDocPickerModal({ isOpen, onClose, selectedDocs, onApply, mode = 'default' }: Props) {
   const [docs, setDocs] = useState<ContextDoc[]>([])
   const [selectedMap, setSelectedMap] = useState<Map<string, ContextDoc>>(new Map())
   const [search, setSearch] = useState('')
@@ -91,6 +93,7 @@ export function MultiDocPickerModal({ isOpen, onClose, selectedDocs, onApply }: 
 
   const handleApply = () => {
     const selectedList = Array.from(selectedMap.values())
+    if (mode === 'compare' && selectedList.length < 2) return
     onApply(selectedList)
     onClose()
   }
@@ -108,20 +111,34 @@ export function MultiDocPickerModal({ isOpen, onClose, selectedDocs, onApply }: 
           className="w-full max-w-xl bg-[#101726] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
         >
           {/* Header */}
-          <div className="p-5 border-b border-white/[0.08] flex items-start justify-between bg-gradient-to-r from-sky-500/10 via-transparent to-transparent shrink-0">
+          <div className={`p-5 border-b border-white/[0.08] flex items-start justify-between bg-gradient-to-r shrink-0 ${
+            mode === 'compare'
+              ? 'from-indigo-500/15 via-purple-500/5 to-transparent'
+              : 'from-sky-500/10 via-transparent to-transparent'
+          }`}>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
-                <Layers className="w-5 h-5" />
+              <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${
+                mode === 'compare'
+                  ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400'
+                  : 'bg-sky-500/20 border-sky-500/30 text-sky-400'
+              }`}>
+                {mode === 'compare' ? <GitCompare className="w-5 h-5" /> : <Layers className="w-5 h-5" />}
               </div>
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <span>Select Context Documents</span>
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
-                    Multi-Doc RAG
+                  <span>{mode === 'compare' ? 'Select Documents to Compare' : 'Select Context Documents'}</span>
+                  <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full border ${
+                    mode === 'compare'
+                      ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/35'
+                      : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                  }`}>
+                    {mode === 'compare' ? 'Compare Mode (2+ Docs)' : 'Multi-Doc RAG'}
                   </span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Select 2 or more documents to compare, synthesize, and cite across topics.
+                  {mode === 'compare'
+                    ? 'Select 2 or more documents to contrast similarities, differences, and unique additions.'
+                    : 'Select 2 or more documents to compare, synthesize, and cite across topics.'}
                 </p>
               </div>
             </div>
@@ -258,11 +275,22 @@ export function MultiDocPickerModal({ isOpen, onClose, selectedDocs, onApply }: 
             <button
               type="button"
               onClick={handleApply}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white text-xs font-bold shadow-lg shadow-sky-500/20 hover:shadow-sky-500/35 transition-all cursor-pointer active:scale-95"
+              disabled={mode === 'compare' && selectedMap.size < 2}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer active:scale-95 ${
+                mode === 'compare' && selectedMap.size < 2
+                  ? 'bg-white/10 text-slate-400 cursor-not-allowed border border-white/5'
+                  : mode === 'compare'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-500 hover:from-indigo-500 hover:to-purple-400 text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40'
+                  : 'bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white shadow-lg shadow-sky-500/20 hover:shadow-sky-500/35'
+              }`}
             >
-              <Sparkles className="w-3.5 h-3.5" />
+              {mode === 'compare' ? <GitCompare className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
               <span>
-                {selectedMap.size === 0
+                {mode === 'compare'
+                  ? selectedMap.size < 2
+                    ? 'Select at least 2 documents'
+                    : `Compare ${selectedMap.size} Documents`
+                  : selectedMap.size === 0
                   ? 'Use Entire Library'
                   : `Chat with ${selectedMap.size} ${selectedMap.size === 1 ? 'Document' : 'Documents'}`}
               </span>

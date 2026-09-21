@@ -12,9 +12,15 @@ from app.models.user import User
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.citation import Citation
-from app.schemas.chat import ConversationResponse, MessageResponse, CitationResponse, CreateMessageRequest
+from app.schemas.chat import (
+    ConversationResponse,
+    MessageResponse,
+    CitationResponse,
+    CreateMessageRequest,
+    CompareDocumentsRequest,
+)
 from app.core.deps import get_current_user
-from app.services.chat_service import generate_rag_response
+from app.services.chat_service import generate_rag_response, handle_comparison_query
 from app.services.llm_provider import generate_conversation_summary
 from app.services.export_service import generate_conversation_pdf, slugify
 
@@ -53,6 +59,7 @@ def list_conversations(
                         except Exception as ce:
                             logger.warning(f"Skipping malformed citation {getattr(c, 'id', 'unknown')}: {ce}")
 
+                    is_comp = bool(m.model and "comparison" in m.model.lower())
                     msg_responses.append(
                         MessageResponse(
                             id=m.id,
@@ -61,7 +68,8 @@ def list_conversations(
                             citations=cit_responses,
                             timestamp=m.created_at.strftime("%I:%M %p") if getattr(m, 'created_at', None) else "",
                             model=m.model,
-                            tokens=m.tokens
+                            tokens=m.tokens,
+                            is_comparison=is_comp,
                         )
                     )
                 except Exception as me:
@@ -145,6 +153,7 @@ def get_conversation(
         cits = db.query(Citation).filter(Citation.message_id == m.id).all()
         cit_responses = [CitationResponse.model_validate(c) for c in cits]
 
+        is_comp = bool(m.model and "comparison" in m.model.lower())
         msg_responses.append(
             MessageResponse(
                 id=m.id,
@@ -152,7 +161,8 @@ def get_conversation(
                 content=m.content,
                 citations=cit_responses,
                 timestamp=m.created_at.strftime("%I:%M %p"),
-                model=m.model
+                model=m.model,
+                is_comparison=is_comp,
             )
         )
 
@@ -365,4 +375,122 @@ async def post_message(
         degraded=rag_metadata.get("degraded", False),
         speech_text=rag_metadata.get("speech_text", ai_msg.content),
     )
+
+
+@router.post("/{conversation_id}/compare", response_model=MessageResponse)
+async def post_comparison_message(
+    conversation_id: str,
+    req: CompareDocumentsRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    conv = db.query(Conversation).filter(
+        Conversation.id == conversation_id,
+        Conversation.user_id == current_user.id
+    ).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    if not req.document_ids or len(req.document_ids) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Comparison mode requires at least 2 documents to compare."
+        )
+
+    # 1. Fetch recent messages for conversational context
+    recent_messages = (
+        db.query(Message)
+        .filter(Message.conversation_id == conv.id)
+        .order_by(Message.created_at.desc())
+        .limit(8)
+        .all()
+    )
+    recent_messages.reverse()
+
+    # 2. Add and persist user message
+    user_query = req.get_query()
+    user_msg = Message(
+        id=str(uuid.uuid4()),
+        conversation_id=conv.id,
+        role="user",
+        content=user_query
+    )
+    db.add(user_msg)
+    db.flush()
+
+    if conv.title == "New Research Session" or conv.title == "New Conversation":
+        conv.title = f"Compare: {user_query[:30]}..." if len(user_query) > 30 else f"Compare: {user_query}"
+
+    # Update conversation's active documents to the compared documents
+    conv.document_ids = req.document_ids
+
+    # 3. Generate comparison response
+    try:
+        answer_text, citations_list, comp_metadata = await asyncio.to_thread(
+            handle_comparison_query,
+            db,
+            current_user.id,
+            conv.id,
+            user_query,
+            req.document_ids,
+            recent_messages,
+            getattr(conv, 'running_summary', None),
+        )
+    except Exception as ce:
+        logger.error(f"Error handling comparison query: {ce}", exc_info=True)
+        answer_text = f"An issue occurred while comparing the selected documents: {str(ce)[:200]}"
+        citations_list = []
+        comp_metadata = {"provider": "error", "degraded": True, "is_comparison": True}
+
+    provider_name = comp_metadata.get("provider", "gemini")
+    model_display = "Gemini 2.5 Flash (Comparison)"
+
+    ai_msg = Message(
+        id=str(uuid.uuid4()),
+        conversation_id=conv.id,
+        role="assistant",
+        content=answer_text,
+        model=model_display,
+    )
+    db.add(ai_msg)
+    db.flush()
+
+    # 4. Save citations
+    citation_responses = []
+    for c in citations_list:
+        try:
+            cit_obj = Citation(
+                id=str(uuid.uuid4()),
+                message_id=ai_msg.id,
+                document_id=c.get("document_id", ""),
+                document_title=c.get("document_title", "Document"),
+                excerpt=c.get("excerpt", ""),
+                page=c.get("page"),
+                chunk=c.get("chunk"),
+                score=c.get("score"),
+                url=f"/api/v1/documents/{c.get('document_id', '')}/file" if c.get("document_id") else None
+            )
+            db.add(cit_obj)
+            db.flush()
+            citation_responses.append(CitationResponse.model_validate(cit_obj))
+        except Exception as err:
+            logger.warning(f"Skipping malformed comparison citation: {err}")
+
+    conv.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(ai_msg)
+
+    return MessageResponse(
+        id=ai_msg.id,
+        role=ai_msg.role,
+        content=ai_msg.content,
+        citations=citation_responses,
+        timestamp=ai_msg.created_at.strftime("%I:%M %p"),
+        model=model_display,
+        provider=provider_name,
+        degraded=comp_metadata.get("degraded", False),
+        speech_text=comp_metadata.get("speech_text", ai_msg.content),
+        is_comparison=True,
+    )
+
 

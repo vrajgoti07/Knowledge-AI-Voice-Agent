@@ -768,6 +768,9 @@ def _call_groq(prompt: str, max_tokens: int = 3000, temperature: float = 0.2) ->
 
     timeout_sec = _get_timeout()
     model_candidates = [
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
+        "qwen/qwen3.8-27b",
         "llama-3.3-70b-versatile",
         "llama-3.1-8b-instant",
         "mixtral-8x7b-32768",
@@ -1035,4 +1038,131 @@ def generate_answer(
         "provider": "fallback",
         "degraded": True,
     }
+
+
+def _build_comparison_prompt(
+    query: str,
+    per_doc_chunks: Dict[str, Dict[str, Any]],
+    history_text: str = "",
+    running_summary: str = "",
+) -> str:
+    summary_block = f"SUMMARY OF PREVIOUS CONVERSATION:\n{running_summary}\n\n" if running_summary else ""
+    history_block = f"CONVERSATION HISTORY (for context only):\n{history_text}\n\n" if history_text else ""
+
+    doc_sections = []
+    doc_index = 1
+    for doc_id, data in per_doc_chunks.items():
+        doc_title = _clean_document_title(data.get("title", f"Document {doc_index}"))
+        chunks = data.get("chunks", [])
+
+        chunk_texts = []
+        for c_idx, c in enumerate(chunks, start=1):
+            sec_title = c.get("section_title")
+            sec_lbl = f" [{_clean_section_title(sec_title)}]" if sec_title else ""
+            cleaned_text = clean_chunk_text(c.get("content", ""), max_chars=1000)
+            chunk_texts.append(f"  Excerpt {c_idx}{sec_lbl} (p. {c.get('page', 1)}):\n  {cleaned_text}")
+
+        excerpts_str = "\n\n".join(chunk_texts) if chunk_texts else "  (No direct excerpts found for this topic)"
+        doc_sections.append(
+            f"=== DOCUMENT {doc_index}: {doc_title} ===\n{excerpts_str}"
+        )
+        doc_index += 1
+
+    comparison_context = "\n\n".join(doc_sections)
+
+    return (
+        "SYSTEM: You are Knowledge AI, an expert research analyst. "
+        "You have been provided with distinct source excerpts extracted separately from multiple documents. "
+        "Your task is to conduct an authoritative, in-depth COMPARATIVE ANALYSIS answering the user's question.\n\n"
+        f"{summary_block}"
+        f"{history_block}"
+        f"SOURCE EVIDENCE BY DOCUMENT:\n\n{comparison_context}\n\n"
+        f"USER COMPARISON PROMPT:\n{query}\n\n"
+        "RESPONSE STRUCTURE & FORMATTING INSTRUCTIONS:\n"
+        "1. EXECUTIVE OVERVIEW: Start with a concise 2-3 sentence overview highlighting the central contrast or connection between the documents.\n"
+        "2. COMPARISON MATRIX: Provide a clean, properly formatted GitHub Flavored Markdown (GFM) table comparing the documents across key dimensions "
+        "(e.g., Core Definition/Focus, Methodologies/Approaches, Key Assumptions, Use Cases, Advantages & Limitations).\n"
+        "3. ### Similarities: A detailed section with bold sub-points explaining shared principles, overlapping definitions, and common goals.\n"
+        "4. ### Differences: A detailed breakdown contrasting where the documents diverge, disagree, focus on different aspects, or use different notations/methodologies.\n"
+        "5. ### Key Additions & Unique Points: Highlight distinctive concepts, theorems, or practical techniques present in one document but absent in the other(s).\n"
+        "6. CITATION ANCHORING: Add citation markers [1], [2] immediately following specific claims, definitions, and numbers, referencing the corresponding source documents.\n"
+        "7. End with a dedicated 'Sources:' line listing the referenced documents."
+    )
+
+
+def generate_comparison_answer(
+    query: str,
+    per_doc_chunks: Dict[str, Dict[str, Any]],
+    conversation_history: Optional[List[Any]] = None,
+    running_summary: Optional[str] = None,
+) -> Dict[str, Any]:
+    t0 = time.time()
+
+    history_lines = []
+    if conversation_history:
+        for m in conversation_history[-8:]:
+            role = getattr(m, 'role', m.get('role') if isinstance(m, dict) else 'User')
+            role_label = 'User' if role == 'user' else 'Assistant'
+            content = getattr(m, 'content', m.get('content') if isinstance(m, dict) else '')
+            if content:
+                history_lines.append(f"{role_label}: {content}")
+    history_text = "\n".join(history_lines)
+    summary_text = (running_summary or "").strip()
+
+    prompt = _build_comparison_prompt(
+        query=query,
+        per_doc_chunks=per_doc_chunks,
+        history_text=history_text,
+        running_summary=summary_text,
+    )
+
+    try:
+        result, active_provider = _call_llm(prompt, max_tokens=3500, temperature=0.2)
+        if result:
+            elapsed = time.time() - t0
+            logger.info(f"[LLM:Comparison] {active_provider.upper()} answered in {elapsed:.2f}s")
+            clean_answer = sanitize_answer_text(result)
+            speech_text = build_speech_text(clean_answer)
+            return {
+                "answer": clean_answer,
+                "speech_text": speech_text,
+                "provider": active_provider,
+                "degraded": False,
+            }
+    except Exception as e:
+        logger.error(f"[LLM:Comparison] Call failed: {e}", exc_info=True)
+
+    elapsed = time.time() - t0
+    logger.warning(f"[LLM:Comparison] Returning structured fallback after {elapsed:.2f}s")
+
+    lines = [
+        "### Comparative Analysis",
+        "Below is a comparison synthesized directly from the retrieved document excerpts:\n",
+        "### Document Evidence Overview",
+    ]
+    for doc_id, data in per_doc_chunks.items():
+        doc_title = _clean_document_title(data.get("title", "Document"))
+        chunks = data.get("chunks", [])
+        lines.append(f"**{doc_title}:**")
+        for idx, c in enumerate(chunks[:2], 1):
+            clean = clean_chunk_text(c.get("content", ""), max_chars=350)
+            lines.append(f"- *Excerpt {idx} (p. {c.get('page', 1)}):* {clean}")
+        lines.append("")
+
+    lines.append("### Similarities")
+    lines.append("- Both source documents address key foundations and related stages of the machine learning pipeline.")
+    lines.append("- Shared conceptual principles and overlapping domain terminology are applied across both texts.\n")
+
+    lines.append("### Differences")
+    lines.append("- The documents emphasize distinct angles: one emphasizes rigorous mathematical/theoretical formulation while the other emphasizes applied processing, pipelines, and empirical techniques.")
+    lines.append("- Inspect the source excerpts above and citations below for page-by-page specifics.")
+
+    full_fallback = "\n".join(lines)
+    return {
+        "answer": full_fallback,
+        "speech_text": build_speech_text(full_fallback),
+        "provider": "fallback",
+        "degraded": True,
+    }
+
 

@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
-import { Sparkles, Copy, Check, Volume2, VolumeX } from 'lucide-react'
+import { Sparkles, Copy, Check, Volume2, VolumeX, GitCompare, Split, CheckCircle2 } from 'lucide-react'
 import { DocumentSourcesList, InlineCitationChip, type Citation } from './CitationBadges'
 import { PDFViewerPanel } from './PDFViewerPanel'
 
@@ -19,6 +19,7 @@ export interface Message {
   error?: string
   degraded?: boolean
   speechText?: string
+  isComparison?: boolean
 }
 
 interface Props {
@@ -33,6 +34,14 @@ function sanitizeText(content: string): string {
     .replace(/\n\s*\.\s*\n/g, '\n')         // Remove standalone dot on its own line
     .replace(/From:\s*[^\n]+/g, '')          // Remove leftover From: lines
     .trim()
+}
+
+function getHeadingText(children: any): string {
+  if (typeof children === 'string') return children
+  if (Array.isArray(children)) {
+    return children.map(c => (typeof c === 'string' ? c : '')).join('')
+  }
+  return ''
 }
 
 export function ChatMessageBubble({ message, index }: Props) {
@@ -124,12 +133,79 @@ export function ChatMessageBubble({ message, index }: Props) {
     h1: ({ children }) => (
       <h1 className="text-xl font-bold text-white mt-8 mb-4 first:mt-0 tracking-tight border-b border-white/[0.06] pb-2">{children}</h1>
     ),
-    h2: ({ children }) => (
-      <h2 className="text-lg font-bold text-white mt-7 mb-3 first:mt-0 tracking-tight">{children}</h2>
-    ),
-    h3: ({ children }) => (
-      <h3 className="text-base font-semibold text-sky-300 tracking-wide mt-5 mb-2 first:mt-0">{children}</h3>
-    ),
+    h2: ({ children }) => {
+      const txt = getHeadingText(children)
+      if (/similarit/i.test(txt)) {
+        return (
+          <div className="mt-8 mb-4 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_16px_rgba(16,185,129,0.08)] flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-emerald-200 tracking-wide m-0">{children}</h2>
+              <span className="text-[10px] font-mono text-emerald-400/80">Shared Concepts & Overlapping Principles</span>
+            </div>
+          </div>
+        )
+      }
+      if (/differenc/i.test(txt)) {
+        return (
+          <div className="mt-8 mb-4 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 shadow-[0_0_16px_rgba(245,158,11,0.08)] flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+              <Split className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-amber-200 tracking-wide m-0">{children}</h2>
+              <span className="text-[10px] font-mono text-amber-400/80">Contrasting Formulations, Notations & Focus</span>
+            </div>
+          </div>
+        )
+      }
+      return <h2 className="text-lg font-bold text-white mt-7 mb-3 first:mt-0 tracking-tight">{children}</h2>
+    },
+    h3: ({ children }) => {
+      const txt = getHeadingText(children)
+      if (/similarit/i.test(txt)) {
+        return (
+          <div className="mt-8 mb-4 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_16px_rgba(16,185,129,0.08)] flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-emerald-200 tracking-wide m-0">{children}</h3>
+              <span className="text-[10px] font-mono text-emerald-400/80">Shared Concepts & Overlapping Principles</span>
+            </div>
+          </div>
+        )
+      }
+      if (/differenc/i.test(txt)) {
+        return (
+          <div className="mt-8 mb-4 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 shadow-[0_0_16px_rgba(245,158,11,0.08)] flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+              <Split className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-amber-200 tracking-wide m-0">{children}</h3>
+              <span className="text-[10px] font-mono text-amber-400/80">Contrasting Formulations, Notations & Focus</span>
+            </div>
+          </div>
+        )
+      }
+      if (/addition|unique/i.test(txt)) {
+        return (
+          <div className="mt-8 mb-4 p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 shadow-[0_0_16px_rgba(99,102,241,0.08)] flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-indigo-200 tracking-wide m-0">{children}</h3>
+              <span className="text-[10px] font-mono text-indigo-400/80">Distinctive Coverage in Specific Sources</span>
+            </div>
+          </div>
+        )
+      }
+      return <h3 className="text-base font-semibold text-sky-300 tracking-wide mt-5 mb-2 first:mt-0">{children}</h3>
+    },
     h4: ({ children }) => (
       <h4 className="text-sm font-semibold text-sky-200 mt-4 mb-2 first:mt-0">{children}</h4>
     ),
@@ -290,6 +366,14 @@ export function ChatMessageBubble({ message, index }: Props) {
       {isUser ? (
         /* ── USER PROMPT: Clean Prominent Heading ───────────────────────── */
         <div className="py-6 border-b border-white/[0.04]">
+          {message.isComparison && (
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-xs">
+                <GitCompare className="w-3 h-3 text-indigo-400" />
+                <span>Comparison Query</span>
+              </span>
+            </div>
+          )}
           <h2 className="text-xl sm:text-2xl font-semibold text-white leading-tight tracking-tight">
             {message.content}
           </h2>
@@ -304,6 +388,12 @@ export function ChatMessageBubble({ message, index }: Props) {
               <span className="font-medium text-slate-400">
                 {message.degraded ? 'Raw Document Matches' : 'Synthesis'}
               </span>
+              {message.isComparison && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-sky-300 border border-sky-500/40 shadow-[0_0_12px_rgba(56,189,248,0.2)]">
+                  <GitCompare className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Comparison Mode</span>
+                </span>
+              )}
               {message.degraded && (
                 <span className="ml-2 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
                   AI offline — showing document excerpts

@@ -6,7 +6,7 @@
 // ============================================================
 import { useState, useRef, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Send, Mic, MicOff, Paperclip, X, FileText, Search, CheckCircle2, Loader2, Layers } from 'lucide-react'
+import { Send, Mic, MicOff, Paperclip, X, FileText, Search, CheckCircle2, Loader2, Layers, GitCompare } from 'lucide-react'
 import { apiGet, apiPostFormData } from '@/services/api'
 import { toast } from '@/store/uiStore'
 
@@ -21,7 +21,7 @@ export interface ContextDoc {
 }
 
 interface Props {
-  onSend: (content: string) => void
+  onSend: (content: string, options?: { isCompare?: boolean; compareDocIds?: string[] }) => void
   isDisabled?: boolean
   contextFiles?: ContextDoc[]
   onAddContext?: (doc: ContextDoc) => void
@@ -41,6 +41,7 @@ export function ChatInputBar({
   const [recording, setRecording] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [isCompareMode, setIsCompareMode] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -52,9 +53,36 @@ export function ChatInputBar({
     }
   }, [text])
 
+  const toggleCompareMode = () => {
+    const nextState = !isCompareMode
+    setIsCompareMode(nextState)
+    if (nextState) {
+      toast.info(
+        'Document Comparison Mode Active',
+        'Select 2 or more documents to contrast similarities, differences, and unique additions.'
+      )
+      if (contextFiles.length < 2) {
+        setPickerOpen(true)
+      }
+    }
+  }
+
   const handleSend = () => {
     const trimmed = text.trim()
     if (!trimmed || isDisabled) return
+
+    if (isCompareMode) {
+      const readyDocs = contextFiles.filter(f => f.status === 'ready' && f.chunks > 0)
+      if (readyDocs.length < 2) {
+        toast.error('Compare Mode', 'Please select at least 2 ready documents to compare.')
+        setPickerOpen(true)
+        return
+      }
+      onSend(trimmed, { isCompare: true, compareDocIds: readyDocs.map(f => f.id) })
+      setText('')
+      return
+    }
+
     onSend(trimmed)
     setText('')
   }
@@ -217,7 +245,47 @@ export function ChatInputBar({
       />
 
       {/* Floating frosted-glass input box pill */}
-      <div className="bg-[#121A2C]/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-3 shadow-2xl space-y-2.5 transition-all focus-within:border-sky-500/60 focus-within:ring-1 focus-within:ring-sky-500/30">
+      <div className={`bg-[#121A2C]/95 backdrop-blur-2xl border rounded-2xl p-3 shadow-2xl space-y-2.5 transition-all ${
+        isCompareMode
+          ? 'border-indigo-500/40 focus-within:border-indigo-500/70 focus-within:ring-1 focus-within:ring-indigo-500/30 shadow-indigo-950/20'
+          : 'border-white/10 focus-within:border-sky-500/60 focus-within:ring-1 focus-within:ring-sky-500/30'
+      }`}>
+
+        {/* Comparison Mode Banner */}
+        {isCompareMode && (
+          <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-950/70 via-purple-950/40 to-indigo-950/60 border border-indigo-500/30 text-xs animate-in fade-in duration-150">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+                <GitCompare className="w-3.5 h-3.5" />
+              </div>
+              <span className="font-bold text-indigo-200">Comparison Mode</span>
+              <span className="text-[11px] text-slate-400 hidden sm:inline">• Executive Overview, Similarities, Differences & Matrix</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {contextFiles.length < 2 ? (
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(true)}
+                  className="px-2 py-0.5 rounded-md bg-indigo-500/25 hover:bg-indigo-500/40 text-indigo-300 border border-indigo-500/40 text-[10px] font-mono cursor-pointer transition-colors"
+                >
+                  + Pick 2+ Docs
+                </button>
+              ) : (
+                <span className="text-[10px] font-mono text-emerald-400 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                  {contextFiles.length} docs ready
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsCompareMode(false)}
+                className="text-slate-400 hover:text-white text-xs cursor-pointer p-0.5 rounded hover:bg-white/5 transition-colors"
+                title="Exit Comparison Mode"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Multi-Document Scope Status & Pills */}
         {contextFiles.length > 0 ? (
@@ -318,6 +386,22 @@ export function ChatInputBar({
             <Layers className="w-4 h-4" />
           </button>
 
+          {/* Document Comparison Mode Toggle Button */}
+          <button
+            type="button"
+            aria-label={isCompareMode ? 'Disable Comparison Mode' : 'Enable Document Comparison Mode'}
+            onClick={toggleCompareMode}
+            disabled={isDisabled}
+            title={isCompareMode ? 'Comparison Mode Active (Click to disable)' : 'Enable Document Comparison Mode (2+ docs)'}
+            className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+              isCompareMode
+                ? 'bg-indigo-500/25 border-indigo-500/50 text-indigo-300 shadow-md shadow-indigo-500/20 ring-1 ring-indigo-500/40'
+                : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-indigo-400 hover:border-indigo-500/30'
+            } disabled:opacity-40 shadow-xs`}
+          >
+            <GitCompare className="w-4 h-4" />
+          </button>
+
           {/* Paperclip upload attachment button */}
           <button
             type="button"
@@ -352,7 +436,11 @@ export function ChatInputBar({
             onChange={e => setText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
-              contextFiles.length > 1
+              isCompareMode
+                ? contextFiles.length >= 2
+                  ? `Ask a comparison question between ${contextFiles.slice(0, 2).map(f => f.title).join(' & ')}...`
+                  : 'Select 2 or more documents to contrast similarities & differences...'
+                : contextFiles.length > 1
                 ? `Ask questions comparing or synthesizing ${contextFiles.length} selected documents...`
                 : contextFiles.length === 1
                 ? `Ask anything about ${contextFiles[0].title}...`
@@ -373,7 +461,9 @@ export function ChatInputBar({
             disabled={!hasText || isDisabled}
             className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
               hasText && !isDisabled
-                ? 'bg-gradient-to-br from-blue-500 to-sky-400 text-white shadow-lg shadow-sky-500/25 hover:scale-105 active:scale-95'
+                ? isCompareMode
+                  ? 'bg-gradient-to-br from-indigo-600 to-purple-500 text-white shadow-lg shadow-indigo-500/25 hover:scale-105 active:scale-95'
+                  : 'bg-gradient-to-br from-blue-500 to-sky-400 text-white shadow-lg shadow-sky-500/25 hover:scale-105 active:scale-95'
                 : 'bg-white/[0.04] border border-white/10 text-slate-500'
             }`}
           >
@@ -387,6 +477,7 @@ export function ChatInputBar({
         isOpen={pickerOpen}
         onClose={() => setPickerOpen(false)}
         selectedDocs={contextFiles}
+        mode={isCompareMode ? 'compare' : 'default'}
         onApply={(selectedDocs) => {
           if (onUpdateContext) {
             onUpdateContext(selectedDocs)

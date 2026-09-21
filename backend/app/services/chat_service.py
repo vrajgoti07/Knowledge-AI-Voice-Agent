@@ -2,12 +2,14 @@ import re
 import time
 import logging
 import concurrent.futures
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any, Optional
 from sqlalchemy.orm import Session
 from app.core.config import settings
+from app.models.document import Document
 from app.services.retrieval_service import search_relevant_chunks
 from app.services.llm_provider import (
     generate_answer,
+    generate_comparison_answer,
     classify_question_llm,
     rewrite_query_with_context,
 )
@@ -267,4 +269,123 @@ def _generate_rag_response_core(
     }
 
     return llm_result["answer"], citations_data, metadata
+
+
+def handle_comparison_query(
+    db: Session,
+    user_id: str,
+    conversation_id: str,
+    user_query: str,
+    document_ids: List[str],
+    conversation_history: List[Any] = None,
+    running_summary: str = None,
+) -> Tuple[str, List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    Executes a structured multi-document comparison query with timeout protection:
+    Runs retrieval separately per document to prevent cross-document starvation,
+    partitions evidence, and synthesizes similarities and differences.
+    """
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(
+                _handle_comparison_query_core,
+                db, user_id, conversation_id, user_query, document_ids,
+                conversation_history, running_summary
+            )
+            return future.result(timeout=RAG_TOTAL_TIMEOUT_SECONDS)
+    except concurrent.futures.TimeoutError:
+        logger.error(f"[Comparison] Total pipeline timeout ({RAG_TOTAL_TIMEOUT_SECONDS}s) exceeded for comparison query")
+        return (
+            "The comparison analysis took too long to generate. Please try again with fewer documents or a more specific question.",
+            [],
+            {"provider": "timeout", "degraded": True, "is_comparison": True}
+        )
+    except Exception as e:
+        logger.error(f"[Comparison] Unexpected error in pipeline: {e}", exc_info=True)
+        return (
+            f"An unexpected error occurred during comparison: {str(e)[:200]}. Please try again.",
+            [],
+            {"provider": "error", "degraded": True, "is_comparison": True}
+        )
+
+
+def _handle_comparison_query_core(
+    db: Session,
+    user_id: str,
+    conversation_id: str,
+    user_query: str,
+    document_ids: List[str],
+    conversation_history: List[Any] = None,
+    running_summary: str = None,
+) -> Tuple[str, List[Dict[str, Any]], Dict[str, Any]]:
+    t0 = time.time()
+    if not document_ids or len(document_ids) < 2:
+        raise ValueError("Comparison mode requires at least 2 document IDs.")
+
+    # 1. Fetch document titles
+    docs = db.query(Document).filter(Document.id.in_(document_ids)).all()
+    doc_title_map = {d.id: d.title for d in docs}
+
+    # 2. Retrieve top chunks SEPARATELY per document
+    per_doc_chunks: Dict[str, Dict[str, Any]] = {}
+    citations_data: List[Dict[str, Any]] = []
+
+    chunks_per_doc = 4
+    for doc_id in document_ids:
+        title = doc_title_map.get(doc_id, f"Document {doc_id[:8]}")
+        try:
+            chunks = search_relevant_chunks(
+                db=db,
+                user_id=user_id,
+                query=user_query,
+                top_k=chunks_per_doc,
+                context_document_ids=[doc_id],
+            )
+        except Exception as e:
+            logger.warning(f"[Comparison] Retrieval failed for doc {doc_id}: {e}")
+            chunks = []
+
+        per_doc_chunks[doc_id] = {
+            "title": title,
+            "chunks": chunks,
+        }
+
+        # Build citations tagged clearly to each source document
+        for c in chunks:
+            score = c.get("score") or c.get("rerank_score") or 0.5
+            if score >= 0.15:
+                citations_data.append({
+                    "document_id": c["document_id"],
+                    "document_title": c.get("document_title") or title,
+                    "excerpt": c["content"][:200] + "..." if len(c["content"]) > 200 else c["content"],
+                    "page": c.get("page", 1),
+                    "chunk": c.get("chunk_index", 0),
+                    "score": round(float(score), 4),
+                })
+
+    t1 = time.time()
+    logger.info(f"[Comparison Timing] Retrieval took {t1 - t0:.2f}s across {len(document_ids)} documents")
+
+    # 3. Call generate_comparison_answer
+    llm_result = generate_comparison_answer(
+        query=user_query,
+        per_doc_chunks=per_doc_chunks,
+        conversation_history=conversation_history,
+        running_summary=running_summary,
+    )
+
+    t2 = time.time()
+    logger.info(f"[Comparison Timing] LLM answer generation took {t2 - t1:.2f}s (Total: {t2 - t0:.2f}s)")
+
+    metadata = {
+        "provider": llm_result["provider"],
+        "degraded": llm_result["degraded"],
+        "speech_text": llm_result.get("speech_text", llm_result["answer"]),
+        "question_type": "COMPARISON",
+        "is_comparison": True,
+        "document_ids": document_ids,
+    }
+
+    return llm_result["answer"], citations_data, metadata
+
 

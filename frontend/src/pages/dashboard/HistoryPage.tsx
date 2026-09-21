@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Search, Sparkles, MessageSquare, ExternalLink, Clock, Layers } from 'lucide-react'
+import { Search, Sparkles, MessageSquare, ExternalLink, Clock, Layers, GitCompare } from 'lucide-react'
 import { Input } from '@/components/ui'
 import { apiGet } from '@/services/api'
 
@@ -13,10 +13,16 @@ interface DialogueMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
-  timestamp: string
+  timestamp?: string
+  created_at?: string
+  createdAt?: string
+  model?: string
+  is_comparison?: boolean
+  isComparison?: boolean
   citations?: {
     id: string
-    documentTitle: string
+    documentTitle?: string
+    document_title?: string
     excerpt: string
     page?: number
   }[]
@@ -135,6 +141,15 @@ export default function HistoryPage() {
                     <span>{new Date(thread.createdAt).toLocaleDateString()}</span>
                     <span>•</span>
                     <span>{thread.messages?.length || 0} msgs</span>
+                    {thread.messages?.some(m => m.isComparison || m.is_comparison || (m.model && m.model.toLowerCase().includes('comparison'))) && (
+                      <>
+                        <span>•</span>
+                        <span className="inline-flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                          <GitCompare className="w-2.5 h-2.5 text-indigo-400" />
+                          <span>compare</span>
+                        </span>
+                      </>
+                    )}
                     {thread.documentIds && thread.documentIds.length > 1 && (
                       <>
                         <span>•</span>
@@ -195,13 +210,21 @@ export default function HistoryPage() {
                       <div className="max-w-2xl space-y-2">
                         <div className="flex items-center gap-2 text-[11px] font-mono text-[#64748B]">
                           {msg.role === 'assistant' ? (
-                            <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                              <Sparkles className="w-3.5 h-3.5" /> Gemini 2.5 Flash
-                            </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                                <Sparkles className="w-3.5 h-3.5" /> Gemini 2.5 Flash
+                              </span>
+                              {(msg.isComparison || msg.is_comparison || (msg.model && msg.model.toLowerCase().includes('comparison'))) && (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/35">
+                                  <GitCompare className="w-3 h-3 text-indigo-400" />
+                                  <span>Comparison Analysis</span>
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-[#38BDF8] font-bold">User</span>
                           )}
-                          <span>• {msg.timestamp}</span>
+                          <span>• {msg.timestamp || (msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'now')}</span>
                         </div>
 
                         <div

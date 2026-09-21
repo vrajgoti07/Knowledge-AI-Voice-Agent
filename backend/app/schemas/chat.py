@@ -35,6 +35,8 @@ class MessageResponse(BaseModel):
     degraded: Optional[bool] = False
     speech_text: Optional[str] = Field(default=None, alias="speechText")
 
+    is_comparison: Optional[bool] = Field(default=False, alias="isComparison")
+
     model_config = ConfigDict(
         from_attributes=True,
         populate_by_name=True,
@@ -68,3 +70,16 @@ class CreateMessageRequest(BaseModel):
 
     def get_content(self) -> str:
         return (self.content or self.message or self.query or "").strip()
+
+
+class CompareDocumentsRequest(BaseModel):
+    document_ids: List[str] = Field(..., min_length=2, alias="documentIds")
+    query: Optional[str] = None
+    content: Optional[str] = None
+    message: Optional[str] = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    def get_query(self) -> str:
+        return (self.query or self.content or self.message or "").strip()
+
