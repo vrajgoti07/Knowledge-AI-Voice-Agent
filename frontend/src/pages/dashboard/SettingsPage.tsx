@@ -100,15 +100,15 @@ export default function SettingsPage() {
       </div>
 
       {/* HORIZONTAL TABS */}
-      <div className="flex items-center gap-6 border-b border-[#1E293B] overflow-x-auto scrollbar-none">
+      <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.04] border border-white/10 w-fit overflow-x-auto scrollbar-none">
         {(['Profile', 'Appearance', 'Notifications', 'Voice Preferences'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`pb-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer select-none ${
               activeTab === tab
-                ? 'border-[#3B82F6] text-[#60A5FA]'
-                : 'border-transparent text-[#94A3B8] hover:text-[#F1F5F9]'
+                ? 'bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white shadow-sm shadow-blue-500/25'
+                : 'text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-white/[0.04]'
             }`}
           >
             {tab}
@@ -118,15 +118,15 @@ export default function SettingsPage() {
 
       {/* 1. PROFILE TAB */}
       {activeTab === 'Profile' && (
-        <Card className="p-6 space-y-6 border-[#1E293B] bg-[#121A2C]">
-          <div className="flex items-center gap-5 pb-4 border-b border-[#1E293B]">
+        <div className="glass-card p-6 space-y-6 shadow-2xl">
+          <div className="flex items-center gap-5 pb-4 border-b border-white/[0.06]">
             <div className="relative">
-              <div className="w-16 h-16 rounded-full bg-[#3B82F6] text-white flex items-center justify-center font-bold text-xl shadow-md">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#3B82F6] to-[#38BDF8] text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/25 ring-2 ring-white/20">
                 {fullName.charAt(0).toUpperCase() || 'U'}
               </div>
               <button
                 type="button"
-                className="absolute bottom-0 right-0 p-1.5 rounded-full bg-[#16213A] border border-[#1E293B] text-[#60A5FA] hover:text-white transition-colors cursor-pointer"
+                className="absolute -bottom-1 -right-1 p-1.5 rounded-xl bg-[#0D1220] border border-white/20 text-[#60A5FA] hover:text-white transition-colors cursor-pointer shadow-md"
                 title="Change Avatar"
               >
                 <Camera className="w-3.5 h-3.5" />
@@ -134,7 +134,7 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <h3 className="text-sm font-semibold text-[#F1F5F9]">{fullName || 'User'}</h3>
+              <h3 className="text-base font-bold text-[#F1F5F9] tracking-tight">{fullName || 'User'}</h3>
               <p className="text-xs text-[#94A3B8]">{user?.email ?? ''}</p>
             </div>
           </div>
@@ -150,21 +150,21 @@ export default function SettingsPage() {
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-semibold text-[#F1F5F9]">Email Address</label>
-                <Badge variant="success" size="sm">Verified</Badge>
+                <Badge variant="success" size="sm" dot>Verified</Badge>
               </div>
               <Input
                 value={user?.email ?? ''}
                 disabled
-                className="bg-[#0A0E1A] opacity-70"
+                className="opacity-70 cursor-not-allowed"
               />
             </div>
 
             <div className="space-y-1">
               <label className="block text-xs font-semibold text-[#F1F5F9]">Role</label>
               <Input
-                value={user?.role === 'admin' ? 'Administrator' : 'Member'}
+                value={user?.role === 'admin' ? 'Administrator' : 'Researcher'}
                 disabled
-                className="bg-[#0A0E1A] opacity-70"
+                className="opacity-70 cursor-not-allowed"
               />
             </div>
 
@@ -180,37 +180,79 @@ export default function SettingsPage() {
               </Button>
             </div>
           </form>
-        </Card>
+        </div>
       )}
 
       {/* 2. APPEARANCE TAB */}
       {activeTab === 'Appearance' && (
-        <Card className="p-6 space-y-6 border-[#1E293B] bg-[#121A2C]">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl bg-[#0A0E1A] border border-[#1E293B]">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                {themeMode === 'light' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-[#60A5FA]" />}
-                <h3 className="text-sm font-semibold text-[#F1F5F9]">
-                  Active Theme: {themeMode === 'light' ? 'Light Mode' : 'Dark Mode'}
-                </h3>
+        <div className="glass-card p-6 space-y-6 shadow-2xl">
+          <div>
+            <h3 className="text-sm font-semibold text-[#F1F5F9]">Interface Theme</h3>
+            <p className="text-xs text-[#94A3B8] mt-0.5">Select your preferred color scheme for research sessions.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Dark Mode Card */}
+            <div
+              onClick={() => { if (themeMode !== 'dark') handleToggleTheme() }}
+              className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-3 ${
+                themeMode === 'dark'
+                  ? 'bg-sky-500/10 border-sky-500/50 shadow-lg shadow-sky-500/10 ring-1 ring-sky-500/30'
+                  : 'bg-white/[0.02] border-white/10 hover:border-white/20'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Moon className="w-4 h-4 text-sky-400" />
+                  <span className="text-xs font-bold text-white">Dark Mode</span>
+                </div>
+                {themeMode === 'dark' && <Badge variant="cyan" size="sm" dot>Active</Badge>}
               </div>
-              <p className="text-xs text-[#94A3B8]">
-                {themeMode === 'light'
-                  ? 'Light mode is active. Click below to switch back to high-contrast dark theme.'
-                  : 'Dark mode is active. Optimized for low-eyestrain research and vector search navigation.'}
-              </p>
+              <div className="h-20 rounded-xl bg-[#0A0E1A] border border-white/10 p-2.5 flex flex-col justify-between">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-red-400/60" />
+                  <div className="w-2 h-2 rounded-full bg-amber-400/60" />
+                  <div className="w-2 h-2 rounded-full bg-emerald-400/60" />
+                </div>
+                <div className="space-y-1">
+                  <div className="w-2/3 h-2 rounded bg-sky-500/30" />
+                  <div className="w-1/2 h-2 rounded bg-white/10" />
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400">Deep navy obsidian theme optimized for low-light research.</p>
             </div>
 
-            <Button
-              variant="secondary"
-              onClick={handleToggleTheme}
-              disabled={themeSaving}
-              leftIcon={themeSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : (themeMode === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />)}
+            {/* Light Mode Card */}
+            <div
+              onClick={() => { if (themeMode !== 'light') handleToggleTheme() }}
+              className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-3 ${
+                themeMode === 'light'
+                  ? 'bg-blue-500/10 border-blue-500/50 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/30'
+                  : 'bg-white/[0.02] border-white/10 hover:border-white/20'
+              }`}
             >
-              Switch to {themeMode === 'light' ? 'Dark Mode' : 'Light Mode'}
-            </Button>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sun className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-bold text-white">Light Mode</span>
+                </div>
+                {themeMode === 'light' && <Badge variant="primary" size="sm" dot>Active</Badge>}
+              </div>
+              <div className="h-20 rounded-xl bg-slate-100 border border-slate-300 p-2.5 flex flex-col justify-between">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-red-400/60" />
+                  <div className="w-2 h-2 rounded-full bg-amber-400/60" />
+                  <div className="w-2 h-2 rounded-full bg-emerald-400/60" />
+                </div>
+                <div className="space-y-1">
+                  <div className="w-2/3 h-2 rounded bg-blue-500/40" />
+                  <div className="w-1/2 h-2 rounded bg-slate-300" />
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400">Clean, crisp light canvas for high ambient light workspaces.</p>
+            </div>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* 3. NOTIFICATIONS TAB */}

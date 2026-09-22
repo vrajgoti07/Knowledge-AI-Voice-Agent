@@ -243,7 +243,7 @@ export default function ChatPage() {
       <div className="flex flex-col h-full relative overflow-hidden bg-[#0A0E1A] flex-1 min-w-0">
 
         {/* Minimalist Top Model Header with Sidebar Toggle & Export PDF Button */}
-        <header className="h-12 border-b border-white/[0.04] bg-[#0A0E1A] flex items-center justify-between px-4 shrink-0 z-10">
+        <header className="h-12 border-b border-white/[0.06] bg-[#0D1220]/70 backdrop-blur-md flex items-center justify-between px-4 shrink-0 z-10 shadow-xs">
           <div className="flex items-center gap-2">
             {!sidebarOpen && (
               <button
@@ -257,9 +257,9 @@ export default function ChatPage() {
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-            <Sparkles className="w-3.5 h-3.5 text-sky-400" />
-            <span>Gemini 2.5 Flash</span>
+          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-xs text-sky-300 font-medium shadow-xs">
+            <Sparkles className="w-3.5 h-3.5 text-sky-400 animate-pulse" />
+            <span className="font-semibold">Gemini 2.5 Flash</span>
           </div>
 
           <div className="flex items-center gap-2">

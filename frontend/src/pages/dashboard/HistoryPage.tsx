@@ -116,7 +116,7 @@ export default function HistoryPage() {
       ) : (
         <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0 overflow-hidden">
           {/* LEFT PANEL: THREADS LIST */}
-          <div className="w-full md:w-[320px] h-full bg-[#121A2C] border border-[#1E293B] rounded-2xl p-4 flex flex-col shrink-0 overflow-y-auto space-y-2">
+          <div className="w-full md:w-[320px] h-full glass-card p-4 flex flex-col shrink-0 overflow-y-auto space-y-2 shadow-xl">
             <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wider mb-2">
               Sessions ({filteredThreads.length})
             </p>
@@ -130,8 +130,8 @@ export default function HistoryPage() {
                   onClick={() => setSelectedThreadId(thread.id)}
                   className={`p-3.5 rounded-xl border transition-all cursor-pointer space-y-1 ${
                     selectedThreadId === thread.id
-                      ? 'bg-[#0A0E1A] border-[#38BDF8]/50 shadow-sm'
-                      : 'bg-[#121A2C] border-[#1E293B] hover:border-[#38BDF8]/30'
+                      ? 'bg-white/[0.08] border-[#38BDF8]/50 shadow-[0_0_15px_rgba(56,189,248,0.12)]'
+                      : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] hover:border-white/15'
                   }`}
                 >
                   <p className="text-xs font-bold text-[#F1F5F9] truncate" title={thread.title}>
@@ -174,10 +174,10 @@ export default function HistoryPage() {
           </div>
 
           {/* RIGHT PANEL: VERBATIM DIALOGUE FEED */}
-          <div className="flex-1 h-full bg-[#0A0E1A] border border-[#1E293B] rounded-2xl p-6 overflow-y-auto space-y-6">
+          <div className="flex-1 h-full glass-card p-6 overflow-y-auto space-y-6 shadow-2xl">
             {activeThread ? (
               <div className="space-y-6">
-                <div className="pb-4 border-b border-[#1E293B] flex items-center justify-between flex-wrap gap-3">
+                <div className="pb-4 border-b border-white/[0.06] flex items-center justify-between flex-wrap gap-3">
                   <div>
                     <div className="flex items-center gap-2.5 flex-wrap">
                       <h3 className="text-base font-bold text-[#F1F5F9]">{activeThread.title}</h3>

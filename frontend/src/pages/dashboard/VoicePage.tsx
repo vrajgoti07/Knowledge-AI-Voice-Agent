@@ -603,7 +603,7 @@ export default function VoicePage() {
 
       <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 overflow-hidden">
         {/* LEFT — Voice Command Center */}
-        <div className="flex-1 relative rounded-2xl bg-[#121A2C] border border-[#1E293B] flex flex-col items-center justify-center p-6 space-y-6 overflow-hidden">
+        <div className="flex-1 relative glass-card flex flex-col items-center justify-center p-6 space-y-6 overflow-hidden shadow-2xl">
           <VoiceOrb status={status} />
           <StatusBadge status={status} />
 
@@ -618,10 +618,10 @@ export default function VoicePage() {
             <button
               type="button"
               onClick={toggleMicSession}
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-semibold cursor-pointer transition-all shadow-lg ${
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-semibold cursor-pointer transition-all shadow-lg active:scale-95 ${
                 isActive
-                  ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white'
-                  : 'bg-gradient-to-r from-[#3B82F6] to-[#38BDF8] text-white hover:scale-105'
+                  ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-red-500/25'
+                  : 'bg-gradient-to-r from-[#3B82F6] to-[#38BDF8] text-white shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-105'
               }`}
             >
               {isActive ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -632,7 +632,7 @@ export default function VoicePage() {
               <button
                 type="button"
                 onClick={handleInterruptBargeIn}
-                className="flex items-center gap-1.5 px-4 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold hover:bg-amber-500/25 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold hover:bg-amber-500/25 transition-all cursor-pointer active:scale-95 shadow-xs"
                 title="Interrupt AI speech"
               >
                 <VolumeX className="w-4 h-4" />
@@ -644,7 +644,7 @@ export default function VoicePage() {
               <button
                 type="button"
                 onClick={stopAllAudio}
-                className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all cursor-pointer"
+                className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all cursor-pointer active:scale-95 shadow-xs"
                 title="End Call"
               >
                 <PhoneOff className="w-4 h-4" />
@@ -654,14 +654,14 @@ export default function VoicePage() {
         </div>
 
         {/* RIGHT — Persistent Live Transcript Panel (Fixed height + internal scroll) */}
-        <div className="w-full lg:w-[420px] shrink-0 rounded-2xl bg-[#121A2C] border border-[#1E293B] flex flex-col h-full overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#1E293B] flex items-center justify-between">
+        <div className="w-full lg:w-[420px] shrink-0 glass-card flex flex-col h-full overflow-hidden shadow-2xl">
+          <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <AudioLines className={`w-4 h-4 ${isActive ? 'text-[#38BDF8]' : 'text-[#64748B]'}`} />
               <span className="text-xs font-bold text-[#F1F5F9] uppercase tracking-wider">Live Transcript</span>
             </div>
             {status === 'Thinking' && (
-              <span className="text-[10px] text-amber-400 flex items-center gap-1">
+              <span className="text-[10px] text-amber-400 flex items-center gap-1 font-mono">
                 <Loader2 className="w-3 h-3 animate-spin" /> Grounding...
               </span>
             )}

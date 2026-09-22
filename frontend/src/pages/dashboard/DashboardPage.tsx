@@ -97,10 +97,7 @@ function relativeTime(isoString: string): string {
 
 export default function DashboardPage() {
   const user = useAuthStore(s => s.user)
-
-  if (user?.role === 'admin') {
-    return <Navigate to={ROUTES.ADMIN} replace />
-  }
+  const isAdmin = user?.role === 'admin'
 
   const [stats, setStats] = useState<Stats | null>(null)
   const [conversations, setConversations] = useState<RecentConv[]>([])
@@ -109,6 +106,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<'chats' | 'docs'>('chats')
 
   const fetchAll = async () => {
+    if (isAdmin) return
     setLoading(true)
     try {
       const [s, convs, docs] = await Promise.all([
@@ -126,7 +124,15 @@ export default function DashboardPage() {
     }
   }
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => {
+    if (!isAdmin) {
+      fetchAll()
+    }
+  }, [isAdmin])
+
+  if (isAdmin) {
+    return <Navigate to={ROUTES.ADMIN} replace />
+  }
 
   const firstName = user?.name?.split(' ')[0] ?? 'there'
 
@@ -149,21 +155,21 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2.5 shrink-0">
           <Link
             to="/chat"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#3B82F6] hover:bg-blue-600 text-white text-xs font-semibold shadow-md shadow-blue-500/20 hover:shadow-blue-500/35 transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#3B82F6] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1D4ED8] text-white text-xs font-semibold shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 transition-all cursor-pointer border border-blue-400/20 active:scale-[0.98]"
           >
             <MessageSquare className="w-4 h-4" />
             <span>Start New Chat</span>
           </Link>
           <Link
             to="/chat"
-            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-transparent border border-[#1E293B] hover:bg-white/[0.04] text-slate-300 hover:text-white text-xs font-medium transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] hover:border-white/20 text-slate-200 hover:text-white text-xs font-medium transition-all cursor-pointer active:scale-[0.98] shadow-xs"
           >
             <Upload className="w-4 h-4 text-sky-400" />
             <span>Attach Document</span>
           </Link>
           <Link
             to="/voice"
-            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-transparent border border-[#1E293B] hover:bg-white/[0.04] text-slate-300 hover:text-white text-xs font-medium transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] hover:border-violet-500/30 text-slate-200 hover:text-white text-xs font-medium transition-all cursor-pointer active:scale-[0.98] shadow-xs"
           >
             <Mic className="w-4 h-4 text-violet-400" />
             <span>Voice Session</span>
@@ -172,7 +178,7 @@ export default function DashboardPage() {
             type="button"
             onClick={fetchAll}
             disabled={loading}
-            className="p-2.5 rounded-xl bg-transparent border border-[#1E293B] hover:bg-white/[0.04] text-slate-400 hover:text-white transition-all cursor-pointer disabled:opacity-50"
+            className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-400 hover:text-white transition-all cursor-pointer disabled:opacity-50 active:scale-[0.98]"
             title="Refresh Data"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -180,43 +186,55 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── 2. METRICS STRIP (Single Full-Width Horizontal Bar) ─────── */}
+      {/* ── 2. METRICS STRIP (Elevated Glass Horizontal Bar) ─────── */}
       <motion.div
         custom={0}
         initial="hidden"
         animate="show"
         variants={fadeUp}
-        className="bg-[#121A2C] border border-[#1E293B] rounded-xl p-5 shadow-xl"
+        className="glass-card p-5 shadow-2xl relative overflow-hidden"
       >
-        <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-white/10">
+        <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-white/[0.08]">
           {/* Total Documents */}
-          <div className="p-3 lg:px-6 lg:first:pl-0 space-y-1">
-            <p className="text-xs uppercase tracking-widest text-slate-500 font-medium">Total Documents</p>
-            <p className="text-2xl sm:text-3xl font-light text-white font-mono tabular-nums">
+          <div className="p-3 lg:px-6 lg:first:pl-0 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Total Documents</p>
+              <FileText className="w-4 h-4 text-sky-400/80" />
+            </div>
+            <p className="text-2xl sm:text-3xl font-light text-white font-mono tabular-nums tracking-tight">
               {loading ? <span className="inline-block w-16 h-7 bg-white/5 rounded animate-pulse" /> : (stats?.totalDocuments ?? 0)}
             </p>
           </div>
 
           {/* Conversations */}
-          <div className="p-3 lg:px-6 space-y-1 pt-4 lg:pt-3">
-            <p className="text-xs uppercase tracking-widest text-slate-500 font-medium">Conversations</p>
-            <p className="text-2xl sm:text-3xl font-light text-white font-mono tabular-nums">
+          <div className="p-3 lg:px-6 space-y-1.5 pt-4 lg:pt-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Conversations</p>
+              <MessageSquare className="w-4 h-4 text-blue-400/80" />
+            </div>
+            <p className="text-2xl sm:text-3xl font-light text-white font-mono tabular-nums tracking-tight">
               {loading ? <span className="inline-block w-16 h-7 bg-white/5 rounded animate-pulse" /> : (stats?.activeConversations ?? 0)}
             </p>
           </div>
 
           {/* Storage Used */}
-          <div className="p-3 lg:px-6 space-y-1 pt-4 lg:pt-3">
-            <p className="text-xs uppercase tracking-widest text-slate-500 font-medium">Storage Used</p>
-            <p className="text-2xl sm:text-3xl font-light text-white font-mono tabular-nums">
+          <div className="p-3 lg:px-6 space-y-1.5 pt-4 lg:pt-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Storage Used</p>
+              <BarChart2 className="w-4 h-4 text-violet-400/80" />
+            </div>
+            <p className="text-2xl sm:text-3xl font-light text-white font-mono tabular-nums tracking-tight">
               {loading ? <span className="inline-block w-16 h-7 bg-white/5 rounded animate-pulse" /> : `${stats?.storageUsedMb ?? 0} MB`}
             </p>
           </div>
 
           {/* Queries This Week */}
-          <div className="p-3 lg:px-6 space-y-1 pt-4 lg:pt-3">
-            <p className="text-xs uppercase tracking-widest text-slate-500 font-medium">Queries This Week</p>
-            <p className="text-2xl sm:text-3xl font-light text-white font-mono tabular-nums">
+          <div className="p-3 lg:px-6 space-y-1.5 pt-4 lg:pt-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Queries This Week</p>
+              <Sparkles className="w-4 h-4 text-emerald-400/80" />
+            </div>
+            <p className="text-2xl sm:text-3xl font-light text-white font-mono tabular-nums tracking-tight">
               {loading ? <span className="inline-block w-16 h-7 bg-white/5 rounded animate-pulse" /> : (stats?.queriesThisWeek ?? 0)}
             </p>
           </div>
@@ -232,7 +250,7 @@ export default function DashboardPage() {
           initial="hidden"
           animate="show"
           variants={fadeUp}
-          className="lg:col-span-2 bg-[#121A2C] border border-[#1E293B] rounded-xl p-6 shadow-xl space-y-5 flex flex-col justify-between"
+          className="lg:col-span-2 glass-card p-6 shadow-2xl space-y-5 flex flex-col justify-between"
         >
           <div className="space-y-4">
             {/* Header + Tabs UI */}
@@ -357,14 +375,14 @@ export default function DashboardPage() {
             initial="hidden"
             animate="show"
             variants={fadeUp}
-            className="bg-[#121A2C] border border-[#1E293B] rounded-xl p-6 shadow-xl space-y-4"
+            className="glass-card p-6 shadow-2xl space-y-4"
           >
             <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
                 <BarChart2 className="w-4 h-4 text-sky-400" />
                 Query Activity
               </h3>
-              <span className="text-[10px] font-mono text-slate-500">7-Day Trend</span>
+              <span className="text-[10px] font-mono text-slate-500 bg-white/[0.04] px-2 py-0.5 rounded-full border border-white/5">7-Day Trend</span>
             </div>
 
             {loading || !stats ? (
@@ -385,16 +403,16 @@ export default function DashboardPage() {
             initial="hidden"
             animate="show"
             variants={fadeUp}
-            className="bg-[#121A2C] border border-[#1E293B] rounded-xl p-6 shadow-xl space-y-3"
+            className="glass-card p-6 shadow-2xl space-y-3"
           >
             <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
                 <Server className="w-4 h-4 text-emerald-400" />
                 System Status
               </h3>
-              <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-400">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Healthy</span>
+              <div className="flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                <span>Operational</span>
               </div>
             </div>
 

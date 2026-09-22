@@ -124,15 +124,15 @@ export default function PersonalLibraryPage() {
       </div>
 
       {/* TABS */}
-      <div className="flex items-center gap-2 border-b border-[#1E293B] pb-3">
+      <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.04] border border-white/10 w-fit">
         {(['Saved Answers', 'Bookmarked Documents', 'My Notes'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none ${
               activeTab === tab
-                ? 'bg-[#3B82F6]/20 text-[#60A5FA] border border-[#3B82F6]/40'
-                : 'text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#121A2C]'
+                ? 'bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white shadow-sm shadow-blue-500/25'
+                : 'text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-white/[0.04]'
             }`}
           >
             {tab}
@@ -144,14 +144,16 @@ export default function PersonalLibraryPage() {
       {activeTab === 'Saved Answers' && (
         <div className="space-y-4">
           {answers.length === 0 ? (
-            <div className="py-16 text-center border border-dashed border-[#1E293B] rounded-2xl bg-[#121A2C] space-y-2">
-              <Bookmark className="w-10 h-10 text-[#64748B] mx-auto opacity-50" />
+            <div className="py-16 text-center glass-card border-dashed border-white/15 space-y-2 shadow-2xl">
+              <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center mx-auto text-slate-500 shadow-inner">
+                <Bookmark className="w-6 h-6 text-[#64748B] opacity-70" />
+              </div>
               <p className="text-xs font-semibold text-[#F1F5F9]">No saved answers yet</p>
               <p className="text-[11px] text-[#94A3B8]">Save key AI responses from your research chat sessions.</p>
             </div>
           ) : (
             answers.map((item) => (
-              <Card key={item.id} className="p-6 border-[#1E293B] bg-[#121A2C] space-y-3">
+              <div key={item.id} className="glass-card p-6 space-y-3 shadow-xl">
                 <div className="flex items-start justify-between gap-4">
                   <h3 className="text-sm font-bold text-[#F1F5F9] flex items-center gap-2">
                     <MessageSquare className="w-4 h-4 text-[#3B82F6]" />
@@ -164,14 +166,14 @@ export default function PersonalLibraryPage() {
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-                <p className="text-xs text-[#CBD5E1] leading-relaxed bg-[#0A0E1A] p-4 rounded-xl border border-[#1E293B]">
+                <p className="text-xs text-[#CBD5E1] leading-relaxed bg-[#0A0E1A]/70 p-4 rounded-xl border border-white/[0.06]">
                   {item.answer}
                 </p>
                 <div className="flex items-center justify-between text-[11px] font-mono text-[#38BDF8]">
                   <span>Citation: {item.citation || 'AI Grounded Search'}</span>
                   <span className="text-[#64748B]">{item.savedDate}</span>
                 </div>
-              </Card>
+              </div>
             ))
           )}
         </div>

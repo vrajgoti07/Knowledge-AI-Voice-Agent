@@ -27,11 +27,12 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           id={inputId}
           ref={ref}
           className={cn(
-            'w-full rounded-lg border bg-bg-primary text-sm text-text-primary placeholder:text-text-muted',
-            'px-3.5 py-2.5 transition-colors duration-150 outline-none resize-y min-h-[100px]',
-            'focus:border-primary focus:ring-2 focus:ring-primary/20',
-            'disabled:opacity-50 disabled:bg-bg-secondary disabled:cursor-not-allowed',
-            error ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border',
+            'w-full rounded-xl border border-white/10 bg-[#0A0E1A] text-sm text-[#F1F5F9] placeholder:text-[#64748B]',
+            'px-3.5 py-2.5 transition-all duration-150 outline-none resize-y min-h-[100px]',
+            'hover:border-white/20',
+            'focus:border-[#38BDF8] focus:ring-2 focus:ring-[#38BDF8]/25 focus:shadow-[0_0_20px_rgba(56,189,248,0.15)]',
+            'disabled:opacity-40 disabled:bg-[#121A2C] disabled:cursor-not-allowed',
+            error ? 'border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]/30' : '',
             className
           )}
           {...props}

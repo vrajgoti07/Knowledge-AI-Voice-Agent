@@ -36,20 +36,21 @@ export function Modal({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-[#0A0E1A]/80 backdrop-blur-sm z-50 animate-fade-in" />
+        <Dialog.Overlay className="fixed inset-0 bg-[#0A0E1A]/85 backdrop-blur-md z-50 animate-fade-in" />
         <Dialog.Content
           className={cn(
             'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92%] sm:w-full p-6',
-            'bg-[#121A2C] border border-[#1E293B] rounded-2xl shadow-2xl animate-fade-up outline-none text-[#F1F5F9]',
+            'bg-[#121A2C] border border-white/10 rounded-2xl shadow-2xl shadow-black/60 animate-fade-up outline-none text-[#F1F5F9]',
+            'before:absolute before:inset-x-0 before:top-0 before:h-[1px] before:bg-gradient-to-r before:from-transparent before:via-white/15 before:to-transparent',
             widths[maxWidth],
             className
           )}
         >
           {(title || description) && (
-            <div className="flex items-start justify-between pb-4 border-b border-[#1E293B] mb-4">
+            <div className="flex items-start justify-between pb-4 border-b border-white/[0.06] mb-4">
               <div>
                 {title && (
-                  <Dialog.Title className="text-base font-semibold text-[#F1F5F9]">
+                  <Dialog.Title className="text-base font-semibold text-[#F1F5F9] tracking-tight">
                     {title}
                   </Dialog.Title>
                 )}
@@ -61,7 +62,7 @@ export function Modal({
               </div>
               <Dialog.Close asChild>
                 <button
-                  className="p-1.5 rounded-lg text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#16213A] transition-colors cursor-pointer"
+                  className="p-1.5 rounded-xl text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-white/[0.06] transition-all cursor-pointer"
                   aria-label="Close dialog"
                 >
                   <X className="w-4 h-4" />

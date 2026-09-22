@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
-import { Sparkles, Copy, Check, Volume2, VolumeX, GitCompare, Split, CheckCircle2 } from 'lucide-react'
+import { Sparkles, Copy, Check, Volume2, VolumeX, GitCompare, Split, CheckCircle2, User } from 'lucide-react'
 import { DocumentSourcesList, InlineCitationChip, type Citation } from './CitationBadges'
 import { PDFViewerPanel } from './PDFViewerPanel'
 
@@ -364,28 +364,37 @@ export function ChatMessageBubble({ message, index }: Props) {
       className="w-full"
     >
       {isUser ? (
-        /* ── USER PROMPT: Clean Prominent Heading ───────────────────────── */
-        <div className="py-6 border-b border-white/[0.04]">
-          {message.isComparison && (
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-xs">
-                <GitCompare className="w-3 h-3 text-indigo-400" />
-                <span>Comparison Query</span>
-              </span>
+        /* ── USER PROMPT: Elevated Glass Card with Avatar ───────────────── */
+        <div className="py-5 my-2">
+          <div className="p-4 sm:p-5 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md shadow-lg flex items-start gap-3.5">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#3B82F6] to-[#38BDF8] text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/30 ring-1 ring-white/20">
+              <User className="w-4 h-4" />
             </div>
-          )}
-          <h2 className="text-xl sm:text-2xl font-semibold text-white leading-tight tracking-tight">
-            {message.content}
-          </h2>
+            <div className="min-w-0 flex-1 space-y-1.5">
+              {message.isComparison && (
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-xs">
+                    <GitCompare className="w-3 h-3 text-indigo-400" />
+                    <span>Comparison Query</span>
+                  </span>
+                </div>
+              )}
+              <h2 className="text-base sm:text-lg font-medium text-[#F1F5F9] leading-relaxed tracking-normal">
+                {message.content}
+              </h2>
+            </div>
+          </div>
         </div>
       ) : (
         /* ── AI SYNTHESIS: Typeset Document Canvas ────────────────────────── */
         <div className="py-6 space-y-4 group">
           {/* AI Header Line + Controls */}
-          <div className="flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center justify-between text-xs text-slate-500 border-b border-white/[0.04] pb-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-sky-400" />
-              <span className="font-medium text-slate-400">
+              <div className="p-1 rounded-lg bg-sky-500/10 border border-sky-500/25">
+                <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+              </div>
+              <span className="font-semibold text-slate-300">
                 {message.degraded ? 'Raw Document Matches' : 'Synthesis'}
               </span>
               {message.isComparison && (

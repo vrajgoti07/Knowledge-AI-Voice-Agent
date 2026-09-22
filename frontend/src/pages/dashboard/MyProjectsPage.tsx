@@ -94,10 +94,12 @@ export default function MyProjectsPage() {
 
       {/* PROJECTS GRID & EMPTY STATE */}
       {projects.length === 0 ? (
-        <div className="py-20 text-center border border-dashed border-[#1E293B] rounded-2xl bg-[#121A2C] space-y-3">
-          <Folder className="w-12 h-12 text-[#64748B] mx-auto opacity-50" />
-          <h3 className="text-base font-bold text-[#F1F5F9]">No research projects created yet</h3>
-          <p className="text-xs text-[#94A3B8] max-w-md mx-auto">
+        <div className="py-20 text-center glass-card border-dashed border-white/15 space-y-3 shadow-2xl">
+          <div className="w-14 h-14 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center mx-auto text-slate-500 shadow-inner">
+            <Folder className="w-7 h-7 text-[#64748B] opacity-70" />
+          </div>
+          <h3 className="text-base font-bold text-[#F1F5F9] tracking-tight">No research projects created yet</h3>
+          <p className="text-xs text-[#94A3B8] max-w-md mx-auto leading-relaxed">
             Projects let you group specific documents and chat conversations together for targeted RAG scoping.
           </p>
           <Button
@@ -116,16 +118,16 @@ export default function MyProjectsPage() {
             const convCount = proj.linkedItems.filter(i => i.type === 'conversation').length
 
             return (
-              <Card
+              <div
                 key={proj.id}
-                className="p-6 border-[#1E293B] bg-[#121A2C] flex flex-col justify-between gap-5 hover:border-[#38BDF8]/40 transition-all group"
+                className="glass-card p-6 flex flex-col justify-between gap-5 hover:border-[#38BDF8]/50 shadow-xl transition-all group"
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="w-10 h-10 rounded-xl bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/30 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#3B82F6]/20 to-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/30 flex items-center justify-center shadow-[0_0_15px_rgba(56,189,248,0.15)] group-hover:scale-105 transition-transform">
                       <Folder className="w-5 h-5" />
                     </div>
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-semibold text-emerald-400">
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-semibold text-emerald-400 shadow-xs">
                       {proj.status}
                     </span>
                   </div>
@@ -140,7 +142,7 @@ export default function MyProjectsPage() {
                   </div>
                 </div>
 
-                <div className="space-y-3 pt-3 border-t border-[#1E293B]">
+                <div className="space-y-3 pt-3 border-t border-white/[0.06]">
                   <div className="flex items-center gap-4 text-xs font-mono text-[#94A3B8]">
                     <span className="flex items-center gap-1">
                       <FileText className="w-3.5 h-3.5 text-[#8B5CF6]" />
@@ -158,7 +160,7 @@ export default function MyProjectsPage() {
                       <button
                         type="button"
                         onClick={() => setSelectedProject(proj)}
-                        className="p-1.5 rounded-lg text-[#64748B] hover:text-[#38BDF8] hover:bg-[#1E293B] transition-colors cursor-pointer"
+                        className="p-1.5 rounded-lg text-[#64748B] hover:text-[#38BDF8] hover:bg-white/[0.06] transition-colors cursor-pointer"
                         title="View details"
                       >
                         <Eye className="w-4 h-4" />
@@ -174,7 +176,7 @@ export default function MyProjectsPage() {
                     </div>
                   </div>
                 </div>
-              </Card>
+              </div>
             )
           })}
         </div>

@@ -245,10 +245,10 @@ export function ChatInputBar({
       />
 
       {/* Floating frosted-glass input box pill */}
-      <div className={`bg-[#121A2C]/95 backdrop-blur-2xl border rounded-2xl p-3 shadow-2xl space-y-2.5 transition-all ${
+      <div className={`relative bg-[#121A2C]/90 backdrop-blur-2xl border rounded-2xl p-3 shadow-2xl space-y-2.5 transition-all shadow-black/50 before:absolute before:inset-x-0 before:top-0 before:h-[1px] before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent ${
         isCompareMode
-          ? 'border-indigo-500/40 focus-within:border-indigo-500/70 focus-within:ring-1 focus-within:ring-indigo-500/30 shadow-indigo-950/20'
-          : 'border-white/10 focus-within:border-sky-500/60 focus-within:ring-1 focus-within:ring-sky-500/30'
+          ? 'border-indigo-500/40 focus-within:border-indigo-500/70 focus-within:ring-2 focus-within:ring-indigo-500/25 focus-within:shadow-[0_0_30px_rgba(99,102,241,0.2)]'
+          : 'border-white/10 focus-within:border-sky-500/60 focus-within:ring-2 focus-within:ring-sky-500/20 focus-within:shadow-[0_0_30px_rgba(56,189,248,0.18)]'
       }`}>
 
         {/* Comparison Mode Banner */}

@@ -17,7 +17,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Mail, Lock, User, ArrowRight, KeyRound } from 'lucide-react'
+import { Mail, Lock, User, ArrowRight, KeyRound, ShieldCheck } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/store/uiStore'
 import { apiPost } from '@/services/api'
@@ -450,6 +450,31 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Quick Admin Auto-fill Chip */}
+          {mode === 'login' && (
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-cyan-950/30 border border-cyan-500/20 text-xs text-slate-300">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <ShieldCheck className="w-4 h-4 shrink-0 text-cyan-400" />
+                <span className="truncate text-[11px]">
+                  Admin: <code className="text-cyan-300 font-mono font-medium">vrajgoti07@gmail.com</code>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('vrajgoti07@gmail.com')
+                  setPassword('123456789')
+                  setServerError(null)
+                  setErrors({})
+                  triggerTypingPulse()
+                }}
+                className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 hover:underline shrink-0 ml-2 cursor-pointer bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/30 transition-colors"
+              >
+                Auto-fill
+              </button>
+            </div>
+          )}
 
           {/* ── ACTION BAR: Shimmering Primary Button + Google SSO ─────── */}
           <div className="flex items-center gap-2.5 pt-1">

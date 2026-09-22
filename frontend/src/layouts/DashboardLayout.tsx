@@ -26,7 +26,7 @@ export function DashboardLayout() {
   }, [location.pathname])
 
   return (
-    <div className="h-screen w-screen flex flex-row overflow-hidden bg-[#0B1120] text-[#F1F5F9] select-none">
+    <div className="h-screen w-screen flex flex-row overflow-hidden bg-[#0A0E1A] text-[#F1F5F9] select-none">
       {/* ── 1. FIXED LEFT SIDEBAR (250px Width, Full Height 100vh) ── */}
       <AppSidebar />
 
