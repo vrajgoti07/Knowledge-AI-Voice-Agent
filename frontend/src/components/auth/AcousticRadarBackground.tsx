@@ -6,7 +6,7 @@
 // 2. Concentric expanding sonar wave ripple rings.
 // 3. Cryptographic coordinate reticle & security target grid.
 // 4. Acoustic frequency jitter/distortion reacting to user typing velocity.
-// Strict Palette: Deep Space Black #050811, Neural Cyan #00F2FE, Electric Blue #0088FF
+// Colors: Uses unified design tokens — voice-active (#22D3EE), accent-primary (#3B82F6)
 // ============================================================
 
 import React, { useEffect, useRef } from 'react'
@@ -68,7 +68,7 @@ export function AcousticRadarBackground({ activityLevel = 0 }: AcousticRadarBack
 
         ctx.beginPath()
         ctx.arc(cx, cy, dynamicRadius, 0, Math.PI * 2)
-        ctx.strokeStyle = `rgba(0, 242, 254, ${ring.alpha + smoothedActivity * 0.15})`
+        ctx.strokeStyle = `rgba(34, 211, 238, ${ring.alpha + smoothedActivity * 0.15})`
         ctx.lineWidth = 1
         ctx.stroke()
 
@@ -82,7 +82,7 @@ export function AcousticRadarBackground({ activityLevel = 0 }: AcousticRadarBack
           ctx.beginPath()
           ctx.moveTo(tx1, ty1)
           ctx.lineTo(tx2, ty2)
-          ctx.strokeStyle = 'rgba(0, 136, 255, 0.35)'
+          ctx.strokeStyle = 'rgba(59, 130, 246, 0.35)'
           ctx.lineWidth = 1
           ctx.stroke()
         }
@@ -94,7 +94,7 @@ export function AcousticRadarBackground({ activityLevel = 0 }: AcousticRadarBack
       ctx.lineTo(cx + 320, cy)
       ctx.moveTo(cx, cy - 320)
       ctx.lineTo(cx, cy + 320)
-      ctx.strokeStyle = 'rgba(0, 136, 255, 0.15)'
+      ctx.strokeStyle = 'rgba(59, 130, 246, 0.15)'
       ctx.setLineDash([4, 6])
       ctx.stroke()
       ctx.setLineDash([])
@@ -112,7 +112,7 @@ export function AcousticRadarBackground({ activityLevel = 0 }: AcousticRadarBack
         ctx.moveTo(cx, cy)
         ctx.arc(cx, cy, sweepLength, segAngle, segAngle + sweepArc / sweepSegments)
         ctx.closePath()
-        ctx.fillStyle = `rgba(0, 242, 254, ${alpha * 0.35})`
+        ctx.fillStyle = `rgba(34, 211, 238, ${alpha * 0.35})`
         ctx.fill()
       }
 
@@ -122,9 +122,9 @@ export function AcousticRadarBackground({ activityLevel = 0 }: AcousticRadarBack
       ctx.beginPath()
       ctx.moveTo(cx, cy)
       ctx.lineTo(lx, ly)
-      ctx.strokeStyle = 'rgba(0, 242, 254, 0.75)'
+      ctx.strokeStyle = 'rgba(34, 211, 238, 0.75)'
       ctx.lineWidth = 1.5
-      ctx.shadowColor = '#00F2FE'
+      ctx.shadowColor = '#22D3EE'
       ctx.shadowBlur = 10
       ctx.stroke()
       ctx.shadowBlur = 0
@@ -152,9 +152,9 @@ export function AcousticRadarBackground({ activityLevel = 0 }: AcousticRadarBack
         className="absolute inset-0 pointer-events-none opacity-25"
         style={{
           backgroundImage: `
-            radial-gradient(circle at center, rgba(0, 242, 254, 0.12) 0%, transparent 60%),
-            linear-gradient(to right, rgba(0, 136, 255, 0.06) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(0, 136, 255, 0.06) 1px, transparent 1px)
+            radial-gradient(circle at center, rgba(34, 211, 238, 0.12) 0%, transparent 60%),
+            linear-gradient(to right, rgba(59, 130, 246, 0.06) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(59, 130, 246, 0.06) 1px, transparent 1px)
           `,
           backgroundSize: '100% 100%, 60px 60px, 60px 60px',
         }}
@@ -164,7 +164,7 @@ export function AcousticRadarBackground({ activityLevel = 0 }: AcousticRadarBack
       <div
         className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full pointer-events-none opacity-30 animate-pulse"
         style={{
-          background: 'radial-gradient(circle, rgba(0, 242, 254, 0.20) 0%, rgba(0, 136, 255, 0.08) 50%, transparent 75%)',
+          background: 'radial-gradient(circle, rgba(34, 211, 238, 0.20) 0%, rgba(59, 130, 246, 0.08) 50%, transparent 75%)',
           filter: 'blur(90px)',
           animationDuration: '6s',
         }}

@@ -5,7 +5,7 @@
 // 2. Concentric soundwave pulse rings expanding dynamically during input focus & typing.
 // 3. Dynamic 7-bar audio spectrum equalizer dancing in real-time.
 // 4. Live status indicator badge: "AI VOICE AGENT // NODE ONLINE".
-// Strict Palette: Deep Space Black #050811, Neural Cyan #00F2FE, Electric Blue #0088FF
+// Colors: Uses unified design tokens from index.css @theme.
 // ============================================================
 
 import React from 'react'
@@ -43,10 +43,10 @@ export function VoiceAgentOrb({
           className={cn(
             'absolute inset-0 rounded-full border border-dashed transition-colors duration-300',
             isError
-              ? 'border-red-400/50'
+              ? 'border-danger/50'
               : isSuccess
-              ? 'border-emerald-400/60'
-              : 'border-cyan-400/40 shadow-[0_0_20px_rgba(0,242,254,0.25)]'
+              ? 'border-success/60'
+              : 'border-voice-active/40 shadow-[0_0_20px_var(--color-voice-glow)]'
           )}
         />
 
@@ -64,10 +64,10 @@ export function VoiceAgentOrb({
           className={cn(
             'absolute inset-1 rounded-full border',
             isError
-              ? 'border-red-400 shadow-[0_0_20px_rgba(239,68,68,0.4)]'
+              ? 'border-danger shadow-[0_0_20px_rgba(239,68,68,0.4)]'
               : isSuccess
-              ? 'border-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.5)]'
-              : 'border-cyan-400/60 shadow-[0_0_25px_rgba(0,242,254,0.35)]'
+              ? 'border-success shadow-[0_0_25px_rgba(34,197,94,0.5)]'
+              : 'border-voice-active/60 shadow-[0_0_25px_var(--color-voice-glow)]'
           )}
         />
 
@@ -86,10 +86,10 @@ export function VoiceAgentOrb({
           className={cn(
             'absolute -inset-1 rounded-full border',
             isError
-              ? 'border-red-500/30'
+              ? 'border-danger/30'
               : isSuccess
-              ? 'border-emerald-500/40'
-              : 'border-blue-500/30 shadow-[0_0_30px_rgba(0,136,255,0.25)]'
+              ? 'border-success/40'
+              : 'border-accent-primary/30 shadow-[0_0_30px_rgba(59,130,246,0.25)]'
           )}
         />
 
@@ -98,10 +98,10 @@ export function VoiceAgentOrb({
           className={cn(
             'relative z-10 w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md transition-all duration-300',
             isError
-              ? 'bg-red-500/20 border border-red-500/60 shadow-[0_0_20px_rgba(239,68,68,0.5)]'
+              ? 'bg-danger/20 border border-danger/60 shadow-[0_0_20px_rgba(239,68,68,0.5)]'
               : isSuccess
-              ? 'bg-emerald-500/20 border border-emerald-400/70 shadow-[0_0_25px_rgba(16,185,129,0.6)]'
-              : 'bg-gradient-to-br from-cyan-500/25 to-blue-600/35 border border-cyan-400/70 shadow-[0_0_25px_rgba(0,242,254,0.45)]'
+              ? 'bg-success/20 border border-success/70 shadow-[0_0_25px_rgba(34,197,94,0.6)]'
+              : 'bg-gradient-to-br from-voice-active/25 to-accent-primary/35 border border-voice-active/70 shadow-[0_0_25px_var(--color-voice-glow)]'
           )}
         >
           {/* Animated 7-Bar Audio Equalizer Spectrum */}
@@ -122,10 +122,10 @@ export function VoiceAgentOrb({
                   'w-[2.5px] rounded-full transition-all duration-150',
                   hClass,
                   isError
-                    ? 'bg-red-400 shadow-[0_0_6px_rgba(239,68,68,0.8)]'
+                    ? 'bg-danger shadow-[0_0_6px_rgba(239,68,68,0.8)]'
                     : isSuccess
-                    ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.9)]'
-                    : 'bg-gradient-to-t from-blue-400 to-cyan-300 shadow-[0_0_6px_rgba(0,242,254,0.8)]'
+                    ? 'bg-success shadow-[0_0_8px_rgba(34,197,94,0.9)]'
+                    : 'bg-gradient-to-t from-accent-primary to-voice-active shadow-[0_0_6px_var(--color-voice-glow)]'
                 )}
               />
             ))}
@@ -134,13 +134,14 @@ export function VoiceAgentOrb({
       </div>
 
       {/* ── 2. LIVE STATUS BADGE: AI VOICE AGENT // NODE ONLINE ──────── */}
-      <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#050811]/90 border border-cyan-500/30 text-[10px] font-mono tracking-wider text-cyan-300 shadow-[0_0_12px_rgba(0,242,254,0.15)]">
+      <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-bg-page/90 border border-accent-primary/30 text-[10px] font-mono tracking-wider text-accent-light shadow-[0_0_12px_rgba(59,130,246,0.15)]">
         <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400" />
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-voice-active opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-voice-active" />
         </span>
         <span>AI VOICE AGENT // NODE ONLINE</span>
       </div>
     </div>
   )
 }
+

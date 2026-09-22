@@ -28,7 +28,7 @@ const VARIANT_CLASSES: Record<string, string> = {
   glass:
     'bg-white/[0.06] backdrop-blur-md border border-white/10 text-[#F1F5F9] hover:bg-white/[0.1] hover:border-white/20 active:scale-[0.98] shadow-sm',
   cyan:
-    'bg-gradient-to-r from-[#06B6D4] to-[#0284C7] text-white hover:from-[#0891B2] hover:to-[#0369A1] shadow-md shadow-cyan-500/25 hover:shadow-cyan-500/40 active:scale-[0.98] font-semibold border border-cyan-400/20',
+    'bg-gradient-to-r from-[#06B6D4] to-[#0284C7] text-white hover:from-[#0891B2] hover:to-[#0369A1] shadow-md shadow-accent-primary/25 hover:shadow-accent-primary/40 active:scale-[0.98] font-semibold border border-accent-primary/20',
 }
 
 const SIZE_CLASSES: Record<string, string> = {

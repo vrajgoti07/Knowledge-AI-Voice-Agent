@@ -2,7 +2,7 @@
 // VoiceprintResonatorBackground — "Listening Field"
 // A unified background system that idles quietly and visibly
 // reacts when the user interacts with auth forms.
-// Strict Palette: #050811, #00F2FE, #0088FF, #818CF8, #38BDF8
+// Colors: Uses unified design tokens — voice-active (#22D3EE), accent-primary (#3B82F6), accent-light (#60A5FA)
 // ============================================================
 
 import React, { useEffect, useRef } from 'react'
@@ -46,10 +46,10 @@ const MAX_MOUSE_DISPLACEMENT = 12
 const RING_LIFETIME_FRAMES = 90 // ~1.5s at 60fps
 
 const PALETTE = {
-  cyan: '#00F2FE',
-  blue: '#0088FF',
-  indigo: '#818CF8',
-  sky: '#38BDF8',
+  cyan: '#22D3EE',
+  blue: '#3B82F6',
+  indigo: '#60A5FA',
+  sky: '#93C5FD',
 } as const
 
 export function VoiceprintResonatorBackground({ activityLevel = 0 }: VoiceprintResonatorBackgroundProps) {

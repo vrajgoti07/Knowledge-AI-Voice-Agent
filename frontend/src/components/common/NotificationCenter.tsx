@@ -171,7 +171,7 @@ export function NotificationCenter() {
                     {item.category === 'ai' && <Sparkles className="w-3.5 h-3.5 text-accent-blue" />}
                     {item.category === 'documents' && <FileText className="w-3.5 h-3.5 text-accent-green" />}
                     {item.category === 'security' && <Shield className="w-3.5 h-3.5 text-warning" />}
-                    {item.category === 'system' && <Cpu className="w-3.5 h-3.5 text-purple-400" />}
+                    {item.category === 'system' && <Cpu className="w-3.5 h-3.5 text-accent-light" />}
                   </div>
 
                   <div className="flex-1 min-w-0">

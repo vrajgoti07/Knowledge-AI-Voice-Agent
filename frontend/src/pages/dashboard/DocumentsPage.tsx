@@ -148,7 +148,7 @@ export default function DocumentsPage() {
                     const chunks = doc.chunks || 0
                     if (st === 'ready' && chunks > 0) {
                       return (
-                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-semibold text-emerald-400">
+                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-success/10 border border-success/30 text-[11px] font-semibold text-success">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>Ready</span>
                         </span>

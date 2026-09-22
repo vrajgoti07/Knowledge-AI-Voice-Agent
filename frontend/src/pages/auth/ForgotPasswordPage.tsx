@@ -78,7 +78,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center bg-[#050811] overflow-hidden p-3 sm:p-5 select-none selection:bg-cyan-500/30 selection:text-cyan-300">
+    <div className="relative min-h-screen w-full flex items-center justify-center bg-[#050811] overflow-hidden p-3 sm:p-5 select-none selection:bg-accent-primary/30 selection:text-accent-light">
       {/* ── 1. GLOBAL TOP-LEFT BACK BUTTON & TOP-RIGHT STATUS BADGE ──── */}
       <AuthHeaderControls backTo={ROUTES.LOGIN} backLabel="Back to Login" />
 
@@ -91,18 +91,18 @@ export default function ForgotPasswordPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full bg-[#050811]/75 backdrop-blur-2xl border border-slate-700/50 border-t-cyan-400/40 rounded-2xl shadow-[0_0_60px_rgba(0,136,255,0.22)] p-5 sm:p-7 relative overflow-hidden"
+          className="w-full bg-[#050811]/75 backdrop-blur-2xl border border-slate-700/50 border-t-accent-light/40 rounded-2xl shadow-[0_0_60px_rgba(59,130,246,0.22)] p-5 sm:p-7 relative overflow-hidden"
         >
           {/* Top Neon Highlight */}
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-accent-light/50 to-transparent" />
 
           {/* Top Bar: Brand Identity */}
           <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
             <Link to="/" className="flex items-center gap-2.5 group">
-              <div className="p-1.5 rounded-lg bg-slate-950/80 border border-slate-800 group-hover:border-cyan-500/50 transition-colors shadow-xs">
-                <AppLogo className="w-5 h-5 text-cyan-400 transition-transform group-hover:scale-105" />
+              <div className="p-1.5 rounded-lg bg-slate-950/80 border border-slate-800 group-hover:border-accent-primary/50 transition-colors shadow-xs">
+                <AppLogo className="w-5 h-5 text-accent-light transition-transform group-hover:scale-105" />
               </div>
-              <span className="text-sm sm:text-base font-bold text-white tracking-tight group-hover:text-cyan-300 transition-colors">
+              <span className="text-sm sm:text-base font-bold text-white tracking-tight group-hover:text-accent-light transition-colors">
                 {APP_NAME}
               </span>
             </Link>
@@ -115,7 +115,7 @@ export default function ForgotPasswordPage() {
               <motion.div
                 animate={{ scale: [1, 1.45, 1], opacity: [0.3, 0.7, 0.3] }}
                 transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-                className="absolute inset-0 rounded-full border border-cyan-400/40 shadow-[0_0_25px_rgba(0,242,254,0.35)]"
+                className="absolute inset-0 rounded-full border border-accent-light/40 shadow-[0_0_25px_rgba(59,130,246,0.35)]"
               />
 
               {/* Radiating Soundwave Radar Scan Ring 2 */}
@@ -126,8 +126,8 @@ export default function ForgotPasswordPage() {
               />
 
               {/* Central Glowing Core Container */}
-              <div className="relative z-10 w-13 h-13 rounded-full bg-gradient-to-br from-cyan-500/25 to-blue-600/35 border border-cyan-400/70 shadow-[0_0_25px_rgba(0,242,254,0.45)] flex items-center justify-center backdrop-blur-md">
-                <Lock className="w-6 h-6 text-cyan-300 drop-shadow-[0_0_10px_rgba(0,242,254,0.8)]" />
+              <div className="relative z-10 w-13 h-13 rounded-full bg-gradient-to-br from-voice-active/25 to-accent-primary/35 border border-accent-light/70 shadow-[0_0_25px_rgba(59,130,246,0.45)] flex items-center justify-center backdrop-blur-md">
+                <Lock className="w-6 h-6 text-accent-light drop-shadow-[0_0_10px_rgba(59,130,246,0.8)]" />
               </div>
             </div>
 
@@ -186,7 +186,7 @@ export default function ForgotPasswordPage() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="cyber-button btn-shimmer group w-full h-10 rounded-lg bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-400 hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(0,242,254,0.5)] text-slate-950 font-bold text-xs sm:text-sm tracking-wide transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                    className="cyber-button btn-shimmer group w-full h-10 rounded-lg bg-gradient-to-r from-accent-primary via-accent-primary-hover to-accent-primary hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] text-white font-bold text-xs sm:text-sm tracking-wide transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
                   >
                     {isLoading ? (
                       <div className="w-4 h-4 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
@@ -214,13 +214,13 @@ export default function ForgotPasswordPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 className="space-y-4 pt-2 text-center"
               >
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs space-y-1">
+                <div className="p-3 rounded-xl bg-success/10 border border-success/30 text-success text-xs space-y-1">
                   <div className="font-semibold flex items-center justify-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <CheckCircle2 className="w-4 h-4 text-success" />
                     <span>Recovery Code Transmitted</span>
                   </div>
                   <p className="text-[11px] text-slate-300">
-                    We sent a secure verification token to <span className="font-mono text-cyan-300">{email}</span>.
+                    We sent a secure verification token to <span className="font-mono text-accent-light">{email}</span>.
                   </p>
                 </div>
 
@@ -228,7 +228,7 @@ export default function ForgotPasswordPage() {
                   <button
                     type="button"
                     onClick={() => navigate(ROUTES.OTP_VERIFICATION, { state: { email } })}
-                    className="flex-1 h-9 rounded-lg bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    className="flex-1 h-9 rounded-lg bg-accent-primary hover:bg-accent-primary-hover text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <span>Enter 6-Digit Code</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -251,7 +251,7 @@ export default function ForgotPasswordPage() {
               Remembered your credentials?{' '}
               <Link
                 to={ROUTES.LOGIN}
-                className="text-cyan-400 font-semibold hover:text-cyan-300 hover:underline cursor-pointer ml-0.5"
+                className="text-accent-light font-semibold hover:text-accent-primary hover:underline cursor-pointer ml-0.5"
               >
                 Log In
               </Link>

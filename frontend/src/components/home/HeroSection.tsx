@@ -131,7 +131,7 @@ export function HeroSection({ onOpenDemo }: { onOpenDemo: () => void }) {
 
           {/* Right Interactive AI Research Workspace Showcase */}
           <div className="lg:col-span-6">
-            <div className="rounded-2xl border border-[#2D3A54] bg-[#131927] shadow-2xl shadow-cyan-500/10 overflow-hidden transition-all duration-200">
+            <div className="rounded-2xl border border-[#2D3A54] bg-[#131927] shadow-2xl shadow-accent-primary/10 overflow-hidden transition-all duration-200">
               {/* Window Title Bar */}
               <div className="px-4 py-3 bg-[#0A0E17] border-b border-[#2D3A54] flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -280,7 +280,7 @@ export function HeroSection({ onOpenDemo }: { onOpenDemo: () => void }) {
                     className={cn(
                       'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer',
                       isSpeaking
-                        ? 'bg-[#00F2FE] text-[#0A0E1A] border-[#00F2FE] shadow-md shadow-cyan-500/25'
+                        ? 'bg-[#00F2FE] text-[#0A0E1A] border-[#00F2FE] shadow-md shadow-accent-primary/25'
                         : 'bg-[#131927] border-[#9D4EDD]/40 text-[#9D4EDD] hover:bg-[#1A2336]'
                     )}
                   >

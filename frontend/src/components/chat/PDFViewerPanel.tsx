@@ -387,7 +387,7 @@ export function PDFViewerPanel({
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-slate-300 bg-white/5 px-2 py-0.5 rounded border border-white/10">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Cited Page Grounded
+                      <CheckCircle2 className="w-3 h-3 text-success" /> Cited Page Grounded
                     </span>
                   )}
 

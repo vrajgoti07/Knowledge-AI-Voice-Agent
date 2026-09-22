@@ -23,7 +23,7 @@ function StatusBadge({ status, chunks }: { status: string; chunks: number }) {
   }
   if (s === 'ready' && chunks > 0) {
     return (
-      <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+      <span className="text-[10px] font-mono text-success flex items-center gap-1">
         <CheckCircle2 className="w-3 h-3" /> Ready
       </span>
     )
@@ -338,7 +338,7 @@ export default function AdminDatasetsPage() {
                     {((d.status || '').toLowerCase() === 'ready' && (d.chunks || 0) > 0) && (
                       <button
                         onClick={() => navigate('/chat', { state: { initialContextDoc: { id: d.id, title: d.title, fileType: d.fileType, chunks: d.chunks, status: d.status } } })}
-                        className="flex items-center gap-1.5 text-[11px] text-emerald-400 hover:text-emerald-300 font-mono transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 text-[11px] text-success hover:text-success font-mono transition-colors cursor-pointer"
                         title="Open AI Chat with this dataset pre-selected"
                       >
                         <MessageSquare className="w-3.5 h-3.5" />

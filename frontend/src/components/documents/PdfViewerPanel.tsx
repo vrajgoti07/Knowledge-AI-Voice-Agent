@@ -359,7 +359,7 @@ export function PdfViewerPanel({
                 <div className="flex items-center gap-2 text-[11px] text-slate-400">
                   <span className="text-sky-300 font-mono">Page {currentPage} of {totalPages}</span>
                   {hasExactMatch ? (
-                    <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
+                    <span className="inline-flex items-center gap-1 text-success font-medium">
                       <CheckCircle2 className="w-3 h-3" /> Exact Excerpt Highlighted
                     </span>
                   ) : (

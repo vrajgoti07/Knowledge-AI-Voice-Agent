@@ -247,18 +247,18 @@ export function ChatInputBar({
       {/* Floating frosted-glass input box pill */}
       <div className={`relative bg-[#121A2C]/90 backdrop-blur-2xl border rounded-2xl p-3 shadow-2xl space-y-2.5 transition-all shadow-black/50 before:absolute before:inset-x-0 before:top-0 before:h-[1px] before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent ${
         isCompareMode
-          ? 'border-indigo-500/40 focus-within:border-indigo-500/70 focus-within:ring-2 focus-within:ring-indigo-500/25 focus-within:shadow-[0_0_30px_rgba(99,102,241,0.2)]'
+          ? 'border-accent-primary/40 focus-within:border-accent-primary/70 focus-within:ring-2 focus-within:ring-accent-primary/25 focus-within:shadow-[0_0_30px_rgba(59,130,246,0.2)]'
           : 'border-white/10 focus-within:border-sky-500/60 focus-within:ring-2 focus-within:ring-sky-500/20 focus-within:shadow-[0_0_30px_rgba(56,189,248,0.18)]'
       }`}>
 
         {/* Comparison Mode Banner */}
         {isCompareMode && (
-          <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-950/70 via-purple-950/40 to-indigo-950/60 border border-indigo-500/30 text-xs animate-in fade-in duration-150">
+          <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-gradient-to-r from-accent-primary/15 via-accent-primary/8 to-accent-primary/12 border border-accent-primary/30 text-xs animate-in fade-in duration-150">
             <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+              <div className="w-5 h-5 rounded-md bg-accent-primary/20 border border-accent-primary/40 flex items-center justify-center text-accent-light">
                 <GitCompare className="w-3.5 h-3.5" />
               </div>
-              <span className="font-bold text-indigo-200">Comparison Mode</span>
+              <span className="font-bold text-accent-light">Comparison Mode</span>
               <span className="text-[11px] text-slate-400 hidden sm:inline">• Executive Overview, Similarities, Differences & Matrix</span>
             </div>
             <div className="flex items-center gap-2">
@@ -266,12 +266,12 @@ export function ChatInputBar({
                 <button
                   type="button"
                   onClick={() => setPickerOpen(true)}
-                  className="px-2 py-0.5 rounded-md bg-indigo-500/25 hover:bg-indigo-500/40 text-indigo-300 border border-indigo-500/40 text-[10px] font-mono cursor-pointer transition-colors"
+                  className="px-2 py-0.5 rounded-md bg-accent-primary/25 hover:bg-accent-primary/40 text-accent-light border border-accent-primary/40 text-[10px] font-mono cursor-pointer transition-colors"
                 >
                   + Pick 2+ Docs
                 </button>
               ) : (
-                <span className="text-[10px] font-mono text-emerald-400 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                <span className="text-[10px] font-mono text-success px-2 py-0.5 rounded-md bg-success/10 border border-success/20">
                   {contextFiles.length} docs ready
                 </span>
               )}
@@ -395,8 +395,8 @@ export function ChatInputBar({
             title={isCompareMode ? 'Comparison Mode Active (Click to disable)' : 'Enable Document Comparison Mode (2+ docs)'}
             className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
               isCompareMode
-                ? 'bg-indigo-500/25 border-indigo-500/50 text-indigo-300 shadow-md shadow-indigo-500/20 ring-1 ring-indigo-500/40'
-                : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-indigo-400 hover:border-indigo-500/30'
+                ? 'bg-accent-primary/25 border-accent-primary/50 text-accent-light shadow-md shadow-accent-primary/20 ring-1 ring-accent-primary/40'
+                : 'bg-white/[0.04] border-white/10 text-slate-400 hover:text-accent-light hover:border-accent-primary/30'
             } disabled:opacity-40 shadow-xs`}
           >
             <GitCompare className="w-4 h-4" />
@@ -462,7 +462,7 @@ export function ChatInputBar({
             className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
               hasText && !isDisabled
                 ? isCompareMode
-                  ? 'bg-gradient-to-br from-indigo-600 to-purple-500 text-white shadow-lg shadow-indigo-500/25 hover:scale-105 active:scale-95'
+                  ? 'bg-gradient-to-br from-accent-primary to-accent-primary-hover text-white shadow-lg shadow-accent-primary/25 hover:scale-105 active:scale-95'
                   : 'bg-gradient-to-br from-blue-500 to-sky-400 text-white shadow-lg shadow-sky-500/25 hover:scale-105 active:scale-95'
                 : 'bg-white/[0.04] border border-white/10 text-slate-500'
             }`}

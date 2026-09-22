@@ -137,13 +137,13 @@ export function ChatMessageBubble({ message, index }: Props) {
       const txt = getHeadingText(children)
       if (/similarit/i.test(txt)) {
         return (
-          <div className="mt-8 mb-4 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_16px_rgba(16,185,129,0.08)] flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+          <div className="mt-8 mb-4 p-3.5 rounded-xl bg-success/10 border border-success/30 shadow-[0_0_16px_rgba(34,197,94,0.08)] flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-success/20 border border-success/30 flex items-center justify-center text-success shrink-0">
               <CheckCircle2 className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-emerald-200 tracking-wide m-0">{children}</h2>
-              <span className="text-[10px] font-mono text-emerald-400/80">Shared Concepts & Overlapping Principles</span>
+              <h2 className="text-base font-bold text-success tracking-wide m-0">{children}</h2>
+              <span className="text-[10px] font-mono text-success/80">Shared Concepts & Overlapping Principles</span>
             </div>
           </div>
         )
@@ -167,13 +167,13 @@ export function ChatMessageBubble({ message, index }: Props) {
       const txt = getHeadingText(children)
       if (/similarit/i.test(txt)) {
         return (
-          <div className="mt-8 mb-4 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_16px_rgba(16,185,129,0.08)] flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+          <div className="mt-8 mb-4 p-3.5 rounded-xl bg-success/10 border border-success/30 shadow-[0_0_16px_rgba(34,197,94,0.08)] flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-success/20 border border-success/30 flex items-center justify-center text-success shrink-0">
               <CheckCircle2 className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-emerald-200 tracking-wide m-0">{children}</h3>
-              <span className="text-[10px] font-mono text-emerald-400/80">Shared Concepts & Overlapping Principles</span>
+              <h3 className="text-base font-bold text-success tracking-wide m-0">{children}</h3>
+              <span className="text-[10px] font-mono text-success/80">Shared Concepts & Overlapping Principles</span>
             </div>
           </div>
         )
@@ -193,13 +193,13 @@ export function ChatMessageBubble({ message, index }: Props) {
       }
       if (/addition|unique/i.test(txt)) {
         return (
-          <div className="mt-8 mb-4 p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 shadow-[0_0_16px_rgba(99,102,241,0.08)] flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+          <div className="mt-8 mb-4 p-3.5 rounded-xl bg-accent-primary/10 border border-accent-primary/30 shadow-[0_0_16px_rgba(59,130,246,0.08)] flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-accent-primary/20 border border-accent-primary/30 flex items-center justify-center text-accent-light shrink-0">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-indigo-200 tracking-wide m-0">{children}</h3>
-              <span className="text-[10px] font-mono text-indigo-400/80">Distinctive Coverage in Specific Sources</span>
+              <h3 className="text-base font-bold text-accent-light tracking-wide m-0">{children}</h3>
+              <span className="text-[10px] font-mono text-accent-light/80">Distinctive Coverage in Specific Sources</span>
             </div>
           </div>
         )
@@ -373,8 +373,8 @@ export function ChatMessageBubble({ message, index }: Props) {
             <div className="min-w-0 flex-1 space-y-1.5">
               {message.isComparison && (
                 <div className="flex items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-xs">
-                    <GitCompare className="w-3 h-3 text-indigo-400" />
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-accent-primary/20 text-accent-light border border-accent-primary/40 shadow-xs">
+                    <GitCompare className="w-3 h-3 text-accent-light" />
                     <span>Comparison Query</span>
                   </span>
                 </div>
@@ -398,7 +398,7 @@ export function ChatMessageBubble({ message, index }: Props) {
                 {message.degraded ? 'Raw Document Matches' : 'Synthesis'}
               </span>
               {message.isComparison && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gradient-to-r from-indigo-500/20 to-sky-500/20 text-sky-300 border border-sky-500/40 shadow-[0_0_12px_rgba(56,189,248,0.2)]">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gradient-to-r from-accent-primary/20 to-sky-500/20 text-sky-300 border border-sky-500/40 shadow-[0_0_12px_rgba(56,189,248,0.2)]">
                   <GitCompare className="w-3.5 h-3.5 text-sky-400" />
                   <span>Comparison Mode</span>
                 </span>
@@ -438,7 +438,7 @@ export function ChatMessageBubble({ message, index }: Props) {
                 className="p-1 rounded text-slate-500 hover:text-slate-200 hover:bg-white/[0.06] transition-all cursor-pointer opacity-70 group-hover:opacity-100"
                 title="Copy text"
               >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
             </div>
           </div>

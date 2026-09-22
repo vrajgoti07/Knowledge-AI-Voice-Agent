@@ -226,7 +226,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
   }
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center bg-[#050811] overflow-hidden p-3 sm:p-5 select-none selection:bg-cyan-500/30 selection:text-cyan-300">
+    <div className="relative min-h-screen w-full flex items-center justify-center bg-[#050811] overflow-hidden p-3 sm:p-5 select-none selection:bg-accent-primary/30 selection:text-accent-light">
       {/* ── 1. GLOBAL TOP-LEFT BACK BUTTON & TOP-RIGHT STATUS BADGE ──── */}
       <AuthHeaderControls backTo="/" backLabel="Back to Home" />
 
@@ -412,8 +412,8 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                 <div
                   className={`w-3.5 h-3.5 rounded flex items-center justify-center transition-all duration-150 border ${
                     rememberMe
-                      ? 'bg-cyan-400 border-cyan-300 text-slate-950 shadow-[0_0_8px_rgba(0,242,254,0.5)]'
-                      : 'bg-slate-950/80 border-slate-700 group-hover:border-cyan-400/50'
+                      ? 'bg-accent-primary border-accent-light text-slate-950 shadow-[0_0_8px_rgba(59,130,246,0.5)]'
+                      : 'bg-slate-950/80 border-slate-700 group-hover:border-accent-primary/50'
                   }`}
                 >
                   {rememberMe && (
@@ -429,7 +429,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
 
               <Link
                 to={ROUTES.FORGOT_PASSWORD}
-                className="text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors font-medium hover:underline"
+                className="text-[11px] text-accent-light hover:text-accent-primary transition-colors font-medium hover:underline"
               >
                 Forgot Password?
               </Link>
@@ -453,11 +453,11 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
 
           {/* Quick Admin Auto-fill Chip */}
           {mode === 'login' && (
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-cyan-950/30 border border-cyan-500/20 text-xs text-slate-300">
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-accent-primary/10 border border-accent-primary/20 text-xs text-slate-300">
               <div className="flex items-center gap-2 overflow-hidden">
-                <ShieldCheck className="w-4 h-4 shrink-0 text-cyan-400" />
+                <ShieldCheck className="w-4 h-4 shrink-0 text-accent-light" />
                 <span className="truncate text-[11px]">
-                  Admin: <code className="text-cyan-300 font-mono font-medium">vrajgoti07@gmail.com</code>
+                  Admin: <code className="text-accent-light font-mono font-medium">vrajgoti07@gmail.com</code>
                 </span>
               </div>
               <button
@@ -469,7 +469,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                   setErrors({})
                   triggerTypingPulse()
                 }}
-                className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 hover:underline shrink-0 ml-2 cursor-pointer bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/30 transition-colors"
+                className="text-[11px] font-semibold text-accent-light hover:text-accent-primary hover:underline shrink-0 ml-2 cursor-pointer bg-accent-primary/10 px-2 py-0.5 rounded border border-accent-primary/30 transition-colors"
               >
                 Auto-fill
               </button>
@@ -482,7 +482,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
             <button
               type="submit"
               disabled={isLoading || isSuccess}
-              className="cyber-button btn-shimmer group flex-1 h-10 rounded-lg bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-400 hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(0,242,254,0.5)] text-slate-950 font-bold text-xs sm:text-sm tracking-wide transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+              className="cyber-button btn-shimmer group flex-1 h-10 rounded-lg bg-gradient-to-r from-accent-primary via-accent-primary-hover to-accent-primary hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] text-white font-bold text-xs sm:text-sm tracking-wide transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
             >
               {isLoading ? (
                 <div className="w-4 h-4 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
@@ -507,7 +507,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
             <button
               type="button"
               onClick={handleGoogleAuth}
-              className="h-10 px-3.5 rounded-lg bg-[#050811]/80 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/40 text-slate-200 hover:text-white flex items-center justify-center gap-2 text-xs font-medium transition-all duration-150 cursor-pointer shadow-xs active:scale-[0.98] shrink-0"
+              className="h-10 px-3.5 rounded-lg bg-[#050811]/80 hover:bg-slate-900 border border-slate-800 hover:border-accent-primary/40 text-slate-200 hover:text-white flex items-center justify-center gap-2 text-xs font-medium transition-all duration-150 cursor-pointer shadow-xs active:scale-[0.98] shrink-0"
               title="Sign in with Google"
             >
               <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
@@ -544,7 +544,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                   setMode('register')
                   navigate('/register')
                 }}
-                className="text-cyan-400 font-semibold hover:text-cyan-300 hover:underline cursor-pointer ml-0.5"
+                className="text-accent-light font-semibold hover:text-accent-primary hover:underline cursor-pointer ml-0.5"
               >
                 Sign Up
               </button>
@@ -558,7 +558,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                   setMode('login')
                   navigate('/login')
                 }}
-                className="text-cyan-400 font-semibold hover:text-cyan-300 hover:underline cursor-pointer ml-0.5"
+                className="text-accent-light font-semibold hover:text-accent-primary hover:underline cursor-pointer ml-0.5"
               >
                 Log In
               </button>

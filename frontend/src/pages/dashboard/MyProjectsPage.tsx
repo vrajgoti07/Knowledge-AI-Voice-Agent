@@ -127,7 +127,7 @@ export default function MyProjectsPage() {
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#3B82F6]/20 to-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/30 flex items-center justify-center shadow-[0_0_15px_rgba(56,189,248,0.15)] group-hover:scale-105 transition-transform">
                       <Folder className="w-5 h-5" />
                     </div>
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-semibold text-emerald-400 shadow-xs">
+                    <span className="px-2.5 py-1 rounded-full bg-success/15 border border-success/30 text-[11px] font-semibold text-success shadow-xs">
                       {proj.status}
                     </span>
                   </div>

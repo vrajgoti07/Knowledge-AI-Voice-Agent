@@ -2,7 +2,7 @@
 // CyberInput — Cyber-Physical Gateway Form Input Component
 // Features flat bg-slate-950/50, left-to-right animated cyan focus sweep,
 // and icon color transitions to cyan on focus.
-// Strict Palette: slate-950, cyan (#22d3ee), blue (#3b82f6), slate-300, white
+// Colors: Uses unified design tokens from index.css @theme.
 // ============================================================
 
 import React, { forwardRef, useState } from 'react'
@@ -35,7 +35,7 @@ export const CyberInput = forwardRef<HTMLInputElement, CyberInputProps>(
             htmlFor={inputId}
             className={cn(
               'block text-xs font-semibold tracking-wide transition-colors duration-200',
-              focused ? 'text-cyan-400' : 'text-slate-300'
+              focused ? 'text-accent-light' : 'text-slate-300'
             )}
           >
             {label}
@@ -51,7 +51,7 @@ export const CyberInput = forwardRef<HTMLInputElement, CyberInputProps>(
               error
                 ? 'border-red-500/70 shadow-[0_0_12px_rgba(239,68,68,0.2)]'
                 : focused
-                ? 'border-slate-700 bg-slate-950/80 shadow-[0_0_15px_rgba(34,211,238,0.15)]'
+                ? 'border-slate-700 bg-slate-950/80 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
                 : 'border-slate-800 hover:border-slate-700/80'
             )}
           >
@@ -61,7 +61,7 @@ export const CyberInput = forwardRef<HTMLInputElement, CyberInputProps>(
                 <Icon
                   className={cn(
                     'w-4 h-4 transition-colors duration-200',
-                    error ? 'text-red-400' : focused ? 'text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.5)]' : 'text-slate-500 group-hover:text-slate-400'
+                    error ? 'text-red-400' : focused ? 'text-accent-light drop-shadow-[0_0_6px_rgba(59,130,246,0.5)]' : 'text-slate-500 group-hover:text-slate-400'
                   )}
                 />
               </div>
@@ -109,12 +109,12 @@ export const CyberInput = forwardRef<HTMLInputElement, CyberInputProps>(
                 tabIndex={-1}
                 className={cn(
                   'absolute right-3 p-1 rounded-md transition-colors cursor-pointer',
-                  focused ? 'text-cyan-400 hover:text-cyan-300' : 'text-slate-500 hover:text-slate-300'
+                  focused ? 'text-accent-light hover:text-accent-primary' : 'text-slate-500 hover:text-slate-300'
                 )}
                 title={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? (
-                  <EyeOff className="w-4 h-4 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.5)]" />
+                  <EyeOff className="w-4 h-4 text-accent-light drop-shadow-[0_0_6px_rgba(59,130,246,0.5)]" />
                 ) : (
                   <Eye className="w-4 h-4" />
                 )}

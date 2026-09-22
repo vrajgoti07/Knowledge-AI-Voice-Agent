@@ -285,8 +285,8 @@ export function DocumentSourcesList({ citations, onOpenPdf }: DocumentSourcesLis
           </button>
 
           {/* Self-drawing SVG checkmark verification moment */}
-          <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
-            <svg className="w-3.5 h-3.5 text-emerald-400 shrink-0" viewBox="0 0 16 16" fill="none">
+          <div className="flex items-center gap-1.5 text-[11px] text-success font-medium">
+            <svg className="w-3.5 h-3.5 text-success shrink-0" viewBox="0 0 16 16" fill="none">
               <motion.path
                 d="M3 8.5L6.5 12L13 4"
                 stroke="currentColor"
@@ -414,7 +414,7 @@ export function DocumentSourcesList({ citations, onOpenPdf }: DocumentSourcesLis
                           className={cn(
                             'h-full rounded-full transition-all duration-500',
                             percent >= 80
-                              ? 'bg-gradient-to-r from-sky-400 to-cyan-300'
+                              ? 'bg-gradient-to-r from-sky-400 to-accent-light'
                               : percent >= 60
                               ? 'bg-sky-400/70'
                               : 'bg-slate-500'

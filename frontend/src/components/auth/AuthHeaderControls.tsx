@@ -3,7 +3,7 @@
 // Features:
 // 1. Top-Left Glassmorphic "← Back" button with hover translation & cyan neon glow.
 // 2. Top-Right "Acoustic Core: Online" live pulsating status badge.
-// Strict Palette: Deep Space Black #050811, Neural Cyan #00F2FE, Electric Blue #0088FF
+// Colors: Uses unified design tokens from index.css @theme.
 // ============================================================
 
 import React from 'react'
@@ -48,9 +48,9 @@ export function AuthHeaderControls({
         initial={{ opacity: 0, x: -12 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        className="group inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#050811]/60 hover:bg-[#080E1C]/80 backdrop-blur-md border border-slate-700/60 hover:border-cyan-400/60 text-slate-300 hover:text-white text-xs font-medium transition-all duration-200 cursor-pointer shadow-[0_0_15px_rgba(0,0,0,0.5)] hover:shadow-[0_0_20px_rgba(0,242,254,0.25)] active:scale-95"
+        className="group inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#050811]/60 hover:bg-[#080E1C]/80 backdrop-blur-md border border-slate-700/60 hover:border-accent-primary/60 text-slate-300 hover:text-white text-xs font-medium transition-all duration-200 cursor-pointer shadow-[0_0_15px_rgba(0,0,0,0.5)] hover:shadow-[0_0_20px_rgba(59,130,246,0.25)] active:scale-95"
       >
-        <ArrowLeft className="w-3.5 h-3.5 text-cyan-400 transition-transform duration-200 group-hover:-translate-x-1" />
+        <ArrowLeft className="w-3.5 h-3.5 text-accent-light transition-transform duration-200 group-hover:-translate-x-1" />
         <span className="tracking-wide">{backLabel}</span>
       </motion.button>
 
@@ -62,11 +62,11 @@ export function AuthHeaderControls({
         className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#050811]/60 backdrop-blur-md border border-slate-700/60 text-xs font-mono text-slate-300 shadow-[0_0_15px_rgba(0,0,0,0.5)]"
       >
         <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
         </span>
         <span className="text-[11px] font-semibold text-slate-200 tracking-wider">
-          Acoustic Core: <span className="text-emerald-400 font-bold">Online</span>
+          Acoustic Core: <span className="text-success font-bold">Online</span>
         </span>
       </motion.div>
     </div>

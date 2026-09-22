@@ -212,7 +212,7 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-red-400/60" />
                   <div className="w-2 h-2 rounded-full bg-amber-400/60" />
-                  <div className="w-2 h-2 rounded-full bg-emerald-400/60" />
+                  <div className="w-2 h-2 rounded-full bg-success/60" />
                 </div>
                 <div className="space-y-1">
                   <div className="w-2/3 h-2 rounded bg-sky-500/30" />
@@ -242,7 +242,7 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-red-400/60" />
                   <div className="w-2 h-2 rounded-full bg-amber-400/60" />
-                  <div className="w-2 h-2 rounded-full bg-emerald-400/60" />
+                  <div className="w-2 h-2 rounded-full bg-success/60" />
                 </div>
                 <div className="space-y-1">
                   <div className="w-2/3 h-2 rounded bg-blue-500/40" />

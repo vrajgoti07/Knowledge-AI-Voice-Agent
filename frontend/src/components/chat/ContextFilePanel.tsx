@@ -70,7 +70,7 @@ export function ContextFilePanel({ contextFiles, onAdd, onRemove, onUpdateContex
                 <p className="text-xs font-semibold text-white truncate" title={doc.title}>{doc.title}</p>
                 <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
                   <span>{doc.chunks} chunks</span>
-                  <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                  <span className="px-1.5 py-0.5 rounded-full bg-success/10 text-success border border-success/20 font-medium">
                     Active
                   </span>
                 </div>

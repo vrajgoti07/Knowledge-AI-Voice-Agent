@@ -52,9 +52,9 @@ function VoiceOrb({ status }: { status: VoiceStatus }) {
     return (
       <div className="relative flex items-center justify-center w-48 h-48">
         <div className={`w-36 h-36 rounded-full flex items-center justify-center border-4 ${
-          isListening ? 'border-cyan-400 bg-cyan-950/60' : isSpeaking ? 'border-indigo-500 bg-indigo-950/60' : 'border-slate-700 bg-slate-900'
+          isListening ? 'border-voice-active bg-bg-page/60' : isSpeaking ? 'border-accent-primary bg-bg-page/60' : 'border-slate-700 bg-slate-900'
         }`}>
-          <AudioLines className={`w-12 h-12 ${isListening ? 'text-cyan-400' : isSpeaking ? 'text-indigo-400' : 'text-slate-500'}`} />
+          <AudioLines className={`w-12 h-12 ${isListening ? 'text-voice-active' : isSpeaking ? 'text-accent-light' : 'text-slate-500'}`} />
         </div>
       </div>
     )
@@ -157,9 +157,9 @@ function VoiceOrb({ status }: { status: VoiceStatus }) {
         {(status === 'Thinking' || isConnecting) && (
           /* AI Thinking Waveform */
           <div className="flex items-center justify-center gap-1.5 h-12">
-            <div className="w-1.5 h-5 bg-cyan-400 rounded-full animate-[pulse_1s_ease-in-out_infinite] shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
-            <div className="w-1.5 h-8 bg-cyan-400 rounded-full animate-[pulse_1.2s_ease-in-out_infinite_0.2s] shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
-            <div className="w-1.5 h-5 bg-cyan-400 rounded-full animate-[pulse_1s_ease-in-out_infinite_0.4s] shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
+            <div className="w-1.5 h-5 bg-voice-active rounded-full animate-[pulse_1s_ease-in-out_infinite] shadow-[0_0_8px_var(--color-voice-glow)]"></div>
+            <div className="w-1.5 h-8 bg-voice-active rounded-full animate-[pulse_1.2s_ease-in-out_infinite_0.2s] shadow-[0_0_8px_var(--color-voice-glow)]"></div>
+            <div className="w-1.5 h-5 bg-voice-active rounded-full animate-[pulse_1s_ease-in-out_infinite_0.4s] shadow-[0_0_8px_var(--color-voice-glow)]"></div>
           </div>
         )}
       </motion.div>

@@ -53,8 +53,8 @@ export function DashboardHeader() {
         </button>
 
         {/* Persistent Voice Agent Status Dot */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono text-emerald-400 shrink-0 shadow-xs">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-success/10 border border-success/20 text-xs font-mono text-success shrink-0 shadow-xs">
+          <span className="w-2 h-2 rounded-full bg-success animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
           <span className="text-[11px] font-semibold">Voice Agent: Online</span>
         </div>
 

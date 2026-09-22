@@ -113,13 +113,13 @@ export function MultiDocPickerModal({ isOpen, onClose, selectedDocs, onApply, mo
           {/* Header */}
           <div className={`p-5 border-b border-white/[0.08] flex items-start justify-between bg-gradient-to-r shrink-0 ${
             mode === 'compare'
-              ? 'from-indigo-500/15 via-purple-500/5 to-transparent'
+              ? 'from-accent-primary/15 via-accent-primary/5 to-transparent'
               : 'from-sky-500/10 via-transparent to-transparent'
           }`}>
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${
                 mode === 'compare'
-                  ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400'
+                  ? 'bg-accent-primary/20 border-accent-primary/40 text-accent-light'
                   : 'bg-sky-500/20 border-sky-500/30 text-sky-400'
               }`}>
                 {mode === 'compare' ? <GitCompare className="w-5 h-5" /> : <Layers className="w-5 h-5" />}
@@ -129,7 +129,7 @@ export function MultiDocPickerModal({ isOpen, onClose, selectedDocs, onApply, mo
                   <span>{mode === 'compare' ? 'Select Documents to Compare' : 'Select Context Documents'}</span>
                   <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full border ${
                     mode === 'compare'
-                      ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/35'
+                      ? 'bg-accent-primary/20 text-accent-light border-accent-primary/35'
                       : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
                   }`}>
                     {mode === 'compare' ? 'Compare Mode (2+ Docs)' : 'Multi-Doc RAG'}
@@ -280,7 +280,7 @@ export function MultiDocPickerModal({ isOpen, onClose, selectedDocs, onApply, mo
                 mode === 'compare' && selectedMap.size < 2
                   ? 'bg-white/10 text-slate-400 cursor-not-allowed border border-white/5'
                   : mode === 'compare'
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-500 hover:from-indigo-500 hover:to-purple-400 text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40'
+                  ? 'bg-gradient-to-r from-accent-primary to-accent-primary-hover hover:from-accent-primary-hover hover:to-accent-primary text-white shadow-lg shadow-accent-primary/25 hover:shadow-accent-primary/40'
                   : 'bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white shadow-lg shadow-sky-500/20 hover:shadow-sky-500/35'
               }`}
             >

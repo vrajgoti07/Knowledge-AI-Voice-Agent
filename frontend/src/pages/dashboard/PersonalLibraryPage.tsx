@@ -196,7 +196,7 @@ export default function PersonalLibraryPage() {
                     <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/30">
                       {doc.fileType || 'PDF'}
                     </span>
-                    <span className="text-[10px] font-semibold text-emerald-400">Ready</span>
+                    <span className="text-[10px] font-semibold text-success">Ready</span>
                   </div>
                   <p className="text-sm font-bold text-[#F1F5F9] truncate">{doc.title}</p>
                   <div className="flex items-center justify-between pt-2 border-t border-[#1E293B] text-[10px] text-[#64748B] font-mono">

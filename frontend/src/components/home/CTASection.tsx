@@ -37,7 +37,7 @@ export function CTASection() {
             <span>Instant Setup in 30 Seconds</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <ShieldCheck className="w-3.5 h-3.5 text-success" />
             <span>No Credit Card Required</span>
           </div>
         </div>

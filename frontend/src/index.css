@@ -48,6 +48,9 @@
   --color-warning: #F59E0B;
   --color-danger:  #EF4444;
 
+  --color-voice-active: #22D3EE;
+  --color-voice-glow:   rgba(34, 211, 238, 0.25);
+
   /* Legacy & Shadcn Aliases */
   --color-bg-primary:   #0A0E1A;
   --color-bg-secondary: #0D1220;
@@ -156,6 +159,9 @@
   --color-background:    #F8FAFC;
   --color-foreground:    #0F172A;
   --color-card:          #FFFFFF;
+
+  --color-voice-active: #0891B2;
+  --color-voice-glow:   rgba(8, 145, 178, 0.25);
 }
 
 /* ============================================================
