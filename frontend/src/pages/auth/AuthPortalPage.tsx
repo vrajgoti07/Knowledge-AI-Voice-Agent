@@ -1,29 +1,27 @@
 // ============================================================
-// AuthPortalPage — AI Voice Agent Authentication Gateway
-// Screen 1: Login ("Authorize Voice Session") -> VoiceprintResonatorBackground
-// Screen 2: Sign Up ("Initialize Voice Agent Node") -> NeuralNodeClusterBackground
+// AuthPortalPage — Knowledge AI Authentication Gateway
+// Visual System: Holographic Intelligence Atmosphere
 // Features:
-// 1. Distinct Dedicated Backgrounds:
-//    - Login: VoiceprintResonatorBackground (3D Acoustic Resonator Vortex & Radial Rays).
-//    - Sign Up: NeuralNodeClusterBackground (3D Synaptic Voice Node Matrix & Laser Streams).
-// 2. Global AuthHeaderControls: Top-Left glassmorphic "← Back" button & "Acoustic Core: Online" badge.
-// 3. Glassmorphic VoiceAuthCard with interactive 3D VoiceAgentOrb header.
-// 4. Soundwave-styled inputs with autofill shields and inline password reveal.
-// 5. Acoustic primary CTA button with animated mini equalizer bars on hover.
+// 1. Holographic Intelligence Atmosphere: Floating translucent knowledge glass fragments,
+//    soft light refraction sweeps, atmospheric depth, and spatial mouse parallax.
+// 2. Global AuthHeaderControls: Top-Left glassmorphic "← Back" button & truthful Acoustic Core health badge.
+// 3. Glassmorphic VoiceAuthCard with 3D VoiceAgentOrb status header.
+// 4. Accessible cyber inputs with semantic autofill compatibility and password reveal.
+// 5. Electric blue primary CTA button.
 // 6. Seamless mode switching with Framer Motion slide/crossfade transitions.
-// Strict Palette: Deep Space Black #050811, Neural Cyan #00F2FE, Electric Blue #0088FF
+// Strict Palette: Deep Space Black #050811, Voice Active #22D3EE, Accent Primary #3B82F6
 // ============================================================
 
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Mail, Lock, User, ArrowRight, KeyRound, ShieldCheck } from 'lucide-react'
+import { Mail, Lock, User, ArrowRight, KeyRound } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/store/uiStore'
 import { apiPost } from '@/services/api'
 import { ROUTES } from '@/constants'
 import { AuthHeaderControls } from '@/components/auth/AuthHeaderControls'
-import { VoiceprintResonatorBackground } from '@/components/auth/VoiceprintResonatorBackground'
+import { HolographicIntelligenceBackground } from '@/components/auth/HolographicIntelligenceBackground'
 import { VoiceAuthCard } from '@/components/auth/VoiceAuthCard'
 import { CyberInput } from '@/components/auth/CyberInput'
 import type { User as UserType } from '@/types'
@@ -113,7 +111,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
     return () => {
       if (decayIntervalRef.current) clearInterval(decayIntervalRef.current)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleFieldFocus = () => {
@@ -145,11 +143,13 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
   }
 
   const handleGoogleAuth = () => {
-    toast.info('Google SSO', 'Connecting to Google OAuth2 Voice Clearance...')
+    toast.info('Google SSO Unavailable', 'Google OAuth is not configured on this server. Please use email and password.')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isLoading || isSuccess) return
+
     const newErrs: typeof errors = {}
 
     if (mode === 'register') {
@@ -164,9 +164,9 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
     }
 
     if (!email.trim()) {
-      newErrs.email = 'Work email is required'
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrs.email = 'Please enter a valid work email'
+      newErrs.email = 'Email address is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      newErrs.email = 'Please enter a valid email address'
     }
 
     if (!password) {
@@ -185,8 +185,8 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
       if (mode === 'register') {
         const res = await Promise.race([
           apiPost<{ user: UserType; token: string; refreshToken: string }>('/auth/register', {
-            name: fullName,
-            email,
+            name: fullName.trim(),
+            email: email.trim(),
             password,
             confirmPassword,
           }),
@@ -194,30 +194,46 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
             setTimeout(() => reject(new Error('SERVER_TIMEOUT')), 10000)
           ),
         ])
-        loginStore(res.user, res.token)
+        loginStore(res.user, res.token, rememberMe)
         setTargetDestination(res.user.role === 'admin' ? ROUTES.ADMIN : ROUTES.DASHBOARD)
         setIsSuccess(true)
-        toast.success('Voice Node Initialized', 'Welcome to Knowledge AI')
+        toast.success('Account Created', 'Welcome to Knowledge AI')
       } else {
         const res = await Promise.race([
           apiPost<{ user: UserType; token: string; refreshToken: string }>('/auth/login', {
-            email,
+            email: email.trim(),
             password,
           }),
           new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('SERVER_TIMEOUT')), 10000)
           ),
         ])
-        loginStore(res.user, res.token)
+        loginStore(res.user, res.token, rememberMe)
         setTargetDestination(res.user.role === 'admin' ? ROUTES.ADMIN : ROUTES.DASHBOARD)
         setIsSuccess(true)
-        toast.success('Voiceprint Verified', `Welcome back, ${res.user.name}`)
+        toast.success('Authentication Successful', `Welcome back, ${res.user.name}`)
       }
     } catch (err: any) {
       const isTimeout = err.message === 'SERVER_TIMEOUT' || err.code === 'ECONNABORTED'
-      const msg = isTimeout
-        ? 'Backend service is not responding. Ensure server is running on port 8000.'
-        : err.response?.data?.detail || 'Invalid credentials. Please verify and try again.'
+      let msg = 'Authentication failed. Please verify your credentials and try again.'
+
+      if (isTimeout) {
+        msg = 'Unable to connect to Knowledge AI. Please verify your network and server status.'
+      } else if (err.response?.status === 401) {
+        msg = 'Email or password is incorrect.'
+      } else if (err.response?.status === 400) {
+        const detail = err.response?.data?.detail
+        if (typeof detail === 'string' && detail.toLowerCase().includes('already exists')) {
+          msg = 'An account with this email already exists.'
+        } else if (typeof detail === 'string') {
+          msg = detail
+        } else {
+          msg = 'Invalid registration details provided.'
+        }
+      } else if (err.response?.data?.detail && typeof err.response.data.detail === 'string') {
+        msg = err.response.data.detail
+      }
+
       setServerError(msg)
       toast.error('Authentication Error', msg)
     } finally {
@@ -230,36 +246,34 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
       {/* ── 1. GLOBAL TOP-LEFT BACK BUTTON & TOP-RIGHT STATUS BADGE ──── */}
       <AuthHeaderControls backTo="/" backLabel="Back to Home" />
 
-      {/* ── 2. HOLOGRAPHIC CYBER-ACOUSTIC MATRIX (Sign In & Sign Up) ── */}
-      <VoiceprintResonatorBackground activityLevel={activityLevel} />
+      {/* ── 2. HOLOGRAPHIC INTELLIGENCE ATMOSPHERE BACKGROUND ───── */}
+      <HolographicIntelligenceBackground
+        activityLevel={activityLevel}
+        voiceState={serverError ? 'error' : 'idle'}
+        isSuccess={isSuccess}
+      />
 
       {/* ── 3. CENTRAL GLASSMORPHIC VOICE AUTH CARD ──────────────────── */}
       <VoiceAuthCard
-        title={mode === 'login' ? 'Authorize Voice Session' : 'Initialize Voice Agent Node'}
+        title={mode === 'login' ? 'Sign in to Knowledge AI' : 'Create your Knowledge AI account'}
         subtitle={
           mode === 'login'
-            ? 'Verify your acoustic clearance to access the enterprise AI neural core.'
-            : 'Initialize your organization voice node to unlock intelligent voice RAG.'
+            ? 'Access your organization’s AI knowledge assistant and voice agent.'
+            : 'Create your account to access your organization’s AI knowledge assistant.'
         }
         isSuccess={isSuccess}
         isTyping={isTyping}
         isError={!!serverError}
         successMessage={
           mode === 'login'
-            ? 'Voiceprint Clearance Verified // Synthesizing...'
-            : 'Voice Node Initialized // Connecting Neural Core...'
+            ? 'Clearance Verified // Redirecting...'
+            : 'Account Created // Redirecting...'
         }
         onWarpComplete={() => {
           navigate(targetDestination)
         }}
       >
-        <form onSubmit={handleSubmit} className="space-y-3" autoComplete="off" data-lpignore="true">
-          {/* Chrome Autofill Decoy Absorbers */}
-          <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', opacity: 0, pointerEvents: 'none' }} aria-hidden="true">
-            <input type="text" name="fake_email_decoy" tabIndex={-1} autoComplete="username" defaultValue="" />
-            <input type="password" name="fake_pass_decoy" tabIndex={-1} autoComplete="current-password" defaultValue="" />
-          </div>
-
+        <form onSubmit={handleSubmit} className="space-y-3">
           {/* ── FORM FIELDS (Screen 1 vs Screen 2 Layout) ─────────────── */}
           <AnimatePresence mode="wait">
             {mode === 'login' ? (
@@ -287,8 +301,8 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                   onBlur={handleFieldBlur}
                   error={errors.email}
                   icon={Mail}
-                  name="kai_usr_voice_id"
-                  autoComplete="new-password"
+                  name="email"
+                  autoComplete="username"
                   inputMode="email"
                 />
 
@@ -307,12 +321,12 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                   onBlur={handleFieldBlur}
                   error={errors.password}
                   icon={Lock}
-                  name="kai_usr_voice_token"
-                  autoComplete="new-password"
+                  name="password"
+                  autoComplete="current-password"
                 />
               </motion.div>
             ) : (
-              /* SCREEN 2: SIGN UP FIELDS (2-Column Grid on Desktop) */
+              /* SCREEN 2: SIGN UP FIELDS (2-Column Grid on Desktop, 1-Column on Mobile) */
               <motion.div
                 key="register-fields"
                 initial={{ opacity: 0, x: 10 }}
@@ -335,8 +349,8 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                   onBlur={handleFieldBlur}
                   error={errors.fullName}
                   icon={User}
-                  name="kai_reg_name"
-                  autoComplete="off"
+                  name="name"
+                  autoComplete="name"
                 />
 
                 <CyberInput
@@ -354,8 +368,8 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                   onBlur={handleFieldBlur}
                   error={errors.email}
                   icon={Mail}
-                  name="kai_reg_email"
-                  autoComplete="new-password"
+                  name="email"
+                  autoComplete="email"
                   inputMode="email"
                 />
 
@@ -374,7 +388,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                   onBlur={handleFieldBlur}
                   error={errors.password}
                   icon={Lock}
-                  name="kai_reg_pass"
+                  name="new-password"
                   autoComplete="new-password"
                 />
 
@@ -392,7 +406,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                   onBlur={handleFieldBlur}
                   error={errors.confirmPassword}
                   icon={Lock}
-                  name="kai_reg_pass_confirm"
+                  name="confirm-password"
                   autoComplete="new-password"
                 />
               </motion.div>
@@ -402,19 +416,20 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
           {/* ── SAME ROW: Remember Me & Forgot Password (Login Only) ─── */}
           {mode === 'login' && (
             <div className="flex items-center justify-between pt-0.5 px-0.5 text-xs">
-              <label className="inline-flex items-center gap-2 cursor-pointer group">
+              <label className="inline-flex items-center gap-2 cursor-pointer group select-none">
                 <input
                   type="checkbox"
+                  id="remember-session-checkbox"
+                  aria-label="Remember session"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="sr-only"
                 />
                 <div
-                  className={`w-3.5 h-3.5 rounded flex items-center justify-center transition-all duration-150 border ${
-                    rememberMe
+                  className={`w-3.5 h-3.5 rounded flex items-center justify-center transition-all duration-150 border ${rememberMe
                       ? 'bg-accent-primary border-accent-light text-slate-950 shadow-[0_0_8px_rgba(59,130,246,0.5)]'
                       : 'bg-slate-950/80 border-slate-700 group-hover:border-accent-primary/50'
-                  }`}
+                    }`}
                 >
                   {rememberMe && (
                     <svg className="w-2.5 h-2.5 text-slate-950 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -429,7 +444,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
 
               <Link
                 to={ROUTES.FORGOT_PASSWORD}
-                className="text-[11px] text-accent-light hover:text-accent-primary transition-colors font-medium hover:underline"
+                className="text-[11px] text-accent-light hover:text-accent-primary transition-colors font-medium hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-light rounded"
               >
                 Forgot Password?
               </Link>
@@ -440,6 +455,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
           <AnimatePresence>
             {serverError && (
               <motion.div
+                role="alert"
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
@@ -451,41 +467,22 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
             )}
           </AnimatePresence>
 
-          {/* Quick Admin Auto-fill Chip */}
-          {mode === 'login' && (
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-accent-primary/10 border border-accent-primary/20 text-xs text-slate-300">
-              <div className="flex items-center gap-2 overflow-hidden">
-                <ShieldCheck className="w-4 h-4 shrink-0 text-accent-light" />
-                <span className="truncate text-[11px]">
-                  Admin: <code className="text-accent-light font-mono font-medium">vrajgoti07@gmail.com</code>
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('vrajgoti07@gmail.com')
-                  setPassword('123456789')
-                  setServerError(null)
-                  setErrors({})
-                  triggerTypingPulse()
-                }}
-                className="text-[11px] font-semibold text-accent-light hover:text-accent-primary hover:underline shrink-0 ml-2 cursor-pointer bg-accent-primary/10 px-2 py-0.5 rounded border border-accent-primary/30 transition-colors"
-              >
-                Auto-fill
-              </button>
-            </div>
-          )}
-
           {/* ── ACTION BAR: Shimmering Primary Button + Google SSO ─────── */}
           <div className="flex items-center gap-2.5 pt-1">
             {/* High-Energy Primary CTA Button with Equalizer Icon */}
             <button
               type="submit"
               disabled={isLoading || isSuccess}
-              className="cyber-button btn-shimmer group flex-1 h-10 rounded-lg bg-gradient-to-r from-accent-primary via-accent-primary-hover to-accent-primary hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] text-white font-bold text-xs sm:text-sm tracking-wide transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+              aria-busy={isLoading}
+              className="cyber-button btn-shimmer group flex-1 h-10 rounded-lg bg-gradient-to-r from-accent-primary via-accent-primary-hover to-accent-primary hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] text-white font-bold text-xs sm:text-sm tracking-wide transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-light focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
               {isLoading ? (
-                <div className="w-4 h-4 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
+                <>
+                  <div className="w-4 h-4 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
+                  <span className="font-semibold uppercase tracking-wider text-slate-950">
+                    {mode === 'login' ? 'Signing In...' : 'Creating Account...'}
+                  </span>
+                </>
               ) : (
                 <>
                   {/* Mini Audio Equalizer Icon on Button */}
@@ -496,21 +493,22 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                   </div>
 
                   <span className="font-semibold uppercase tracking-wider text-slate-950">
-                    {mode === 'login' ? 'Authorize Session' : 'Create Account'}
+                    {mode === 'login' ? 'Sign In' : 'Create Account'}
                   </span>
                   <ArrowRight className="w-3.5 h-3.5 text-slate-950 transition-transform group-hover:translate-x-0.5" />
                 </>
               )}
             </button>
 
-            {/* Seamless Dark Glass Google SSO Button */}
+            {/* Seamless Dark Glass Google SSO Button (Honestly Labeled as Unavailable) */}
             <button
               type="button"
               onClick={handleGoogleAuth}
-              className="h-10 px-3.5 rounded-lg bg-[#050811]/80 hover:bg-slate-900 border border-slate-800 hover:border-accent-primary/40 text-slate-200 hover:text-white flex items-center justify-center gap-2 text-xs font-medium transition-all duration-150 cursor-pointer shadow-xs active:scale-[0.98] shrink-0"
-              title="Sign in with Google"
+              aria-label="Sign in with Google (OAuth not configured)"
+              className="h-10 px-3.5 rounded-lg bg-[#050811]/60 hover:bg-[#080E1C] border border-slate-800/80 hover:border-slate-700 text-slate-400 hover:text-slate-300 flex items-center justify-center gap-2 text-xs font-medium transition-all duration-150 cursor-pointer shadow-xs active:scale-[0.98] shrink-0 opacity-80"
+              title="Google SSO is not configured on this server"
             >
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 shrink-0 grayscale-[40%]" viewBox="0 0 24 24">
                 <path
                   fill="#EA4335"
                   d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"
@@ -528,7 +526,7 @@ export function AuthPortalPage({ initialMode = 'login' }: AuthPortalPageProps) {
                   d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"
                 />
               </svg>
-              <span className="hidden xs:inline text-[11px] font-mono uppercase">Google SSO</span>
+              <span className="hidden xs:inline text-[11px] font-mono uppercase text-slate-400">Google SSO</span>
             </button>
           </div>
         </form>

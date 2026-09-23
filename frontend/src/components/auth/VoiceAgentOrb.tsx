@@ -9,13 +9,15 @@
 // ============================================================
 
 import React from 'react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
+import { useSystemHealth, type SystemHealthStatus } from '@/hooks/useSystemHealth'
 import { cn } from '@/utils'
 
 interface VoiceAgentOrbProps {
   isTyping?: boolean
   isSuccess?: boolean
   isError?: boolean
+  systemStatus?: SystemHealthStatus
   className?: string
 }
 
@@ -23,8 +25,13 @@ export function VoiceAgentOrb({
   isTyping = false,
   isSuccess = false,
   isError = false,
+  systemStatus,
   className,
 }: VoiceAgentOrbProps) {
+  const shouldReduceMotion = useReducedMotion()
+  const { status: detectedStatus } = useSystemHealth()
+  const activeStatus = systemStatus || detectedStatus
+
   // Equalizer bar heights based on acoustic state
   const barHeights = isTyping
     ? ['h-5', 'h-7', 'h-4', 'h-8', 'h-6', 'h-7', 'h-4']
@@ -38,7 +45,7 @@ export function VoiceAgentOrb({
       <div className="relative flex items-center justify-center w-18 h-18">
         {/* Rotating Outer Dashed Frequency Ring */}
         <motion.div
-          animate={{ rotate: 360 }}
+          animate={shouldReduceMotion ? undefined : { rotate: 360 }}
           transition={{ duration: isTyping ? 12 : 25, repeat: Infinity, ease: 'linear' }}
           className={cn(
             'absolute inset-0 rounded-full border border-dashed transition-colors duration-300',
@@ -52,10 +59,14 @@ export function VoiceAgentOrb({
 
         {/* Outer Pulsing Soundwave Ring 1 */}
         <motion.div
-          animate={{
-            scale: isTyping ? [1, 1.4, 1] : [1, 1.2, 1],
-            opacity: isTyping ? [0.4, 0.8, 0.4] : [0.2, 0.45, 0.2],
-          }}
+          animate={
+            shouldReduceMotion
+              ? undefined
+              : {
+                  scale: isTyping ? [1, 1.4, 1] : [1, 1.2, 1],
+                  opacity: isTyping ? [0.4, 0.8, 0.4] : [0.2, 0.45, 0.2],
+                }
+          }
           transition={{
             duration: isTyping ? 1.0 : 2.4,
             repeat: Infinity,
@@ -73,10 +84,14 @@ export function VoiceAgentOrb({
 
         {/* Outer Pulsing Soundwave Ring 2 */}
         <motion.div
-          animate={{
-            scale: isTyping ? [1.1, 1.6, 1.1] : [1.05, 1.35, 1.05],
-            opacity: isTyping ? [0.25, 0.65, 0.25] : [0.1, 0.3, 0.1],
-          }}
+          animate={
+            shouldReduceMotion
+              ? undefined
+              : {
+                  scale: isTyping ? [1.1, 1.6, 1.1] : [1.05, 1.35, 1.05],
+                  opacity: isTyping ? [0.25, 0.65, 0.25] : [0.1, 0.3, 0.1],
+                }
+          }
           transition={{
             duration: isTyping ? 1.2 : 2.8,
             repeat: Infinity,
@@ -109,9 +124,13 @@ export function VoiceAgentOrb({
             {barHeights.map((hClass, idx) => (
               <motion.div
                 key={idx}
-                animate={{
-                  scaleY: isTyping ? [0.35, 1.3, 0.5, 1.5, 0.4] : [0.5, 1.0, 0.4],
-                }}
+                animate={
+                  shouldReduceMotion
+                    ? undefined
+                    : {
+                        scaleY: isTyping ? [0.35, 1.3, 0.5, 1.5, 0.4] : [0.5, 1.0, 0.4],
+                      }
+                }
                 transition={{
                   duration: isTyping ? 0.4 + idx * 0.08 : 0.7 + idx * 0.1,
                   repeat: Infinity,
@@ -133,13 +152,50 @@ export function VoiceAgentOrb({
         </div>
       </div>
 
-      {/* ── 2. LIVE STATUS BADGE: AI VOICE AGENT // NODE ONLINE ──────── */}
+      {/* ── 2. LIVE STATUS BADGE: SYNCHRONIZED SYSTEM STATUS ──────── */}
       <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-bg-page/90 border border-accent-primary/30 text-[10px] font-mono tracking-wider text-accent-light shadow-[0_0_12px_rgba(59,130,246,0.15)]">
-        <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-voice-active opacity-75" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-voice-active" />
-        </span>
-        <span>AI VOICE AGENT // NODE ONLINE</span>
+        {isError ? (
+          <>
+            <span className="relative flex h-2 w-2">
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-danger" />
+            </span>
+            <span className="text-red-400 font-semibold">AI VOICE AGENT // NODE ERROR</span>
+          </>
+        ) : activeStatus === 'offline' ? (
+          <>
+            <span className="relative flex h-2 w-2">
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+            </span>
+            <span className="text-red-400 font-semibold">AI VOICE AGENT // SYSTEM OFFLINE</span>
+          </>
+        ) : activeStatus === 'checking' ? (
+          <>
+            <span className="relative flex h-2 w-2">
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-light animate-pulse" />
+            </span>
+            <span>AI VOICE AGENT // INITIALIZING...</span>
+          </>
+        ) : activeStatus === 'degraded' ? (
+          <>
+            <span className="relative flex h-2 w-2">
+              {!shouldReduceMotion && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+              )}
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
+            </span>
+            <span className="text-amber-400 font-semibold">AI VOICE AGENT // CORE DEGRADED</span>
+          </>
+        ) : (
+          <>
+            <span className="relative flex h-2 w-2">
+              {!shouldReduceMotion && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-voice-active opacity-75" />
+              )}
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-voice-active" />
+            </span>
+            <span>AI VOICE AGENT // NODE ONLINE</span>
+          </>
+        )}
       </div>
     </div>
   )

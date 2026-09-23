@@ -184,7 +184,7 @@ export function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-// ── Storage (Session Storage for Session Auth Persistence) ───────
+// ── Storage (Session vs Local Auth Persistence) ─────────────────
 export const storage = {
   get<T>(key: string, fallback?: T): T | undefined {
     try {
@@ -194,12 +194,17 @@ export const storage = {
       return fallback
     }
   },
-  set(key: string, value: unknown): void {
+  set(key: string, value: unknown, persistent = false): void {
     try {
-      sessionStorage.setItem(key, JSON.stringify(value))
+      const str = JSON.stringify(value)
+      if (persistent) {
+        localStorage.setItem(key, str)
+      } else {
+        sessionStorage.setItem(key, str)
+      }
       // Also sync to localStorage for theme/preferences if needed
       if (key.includes('theme') || key.includes('prefs')) {
-        localStorage.setItem(key, JSON.stringify(value))
+        localStorage.setItem(key, str)
       }
     } catch {
       /* noop */

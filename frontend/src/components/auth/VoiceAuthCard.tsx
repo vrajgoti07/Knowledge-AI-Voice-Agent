@@ -9,7 +9,7 @@
 // ============================================================
 
 import React, { useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { CheckCircle2 } from 'lucide-react'
 import { AppLogo } from '@/components/common/AppLogo'
@@ -40,14 +40,16 @@ export function VoiceAuthCard({
   successMessage = 'Voiceprint Clearance Verified // Synthesizing...',
   onWarpComplete,
 }: VoiceAuthCardProps) {
+  const shouldReduceMotion = useReducedMotion()
+
   useEffect(() => {
     if (isSuccess && onWarpComplete) {
       const timer = setTimeout(() => {
         onWarpComplete()
-      }, 1500)
+      }, shouldReduceMotion ? 250 : 700)
       return () => clearTimeout(timer)
     }
-  }, [isSuccess, onWarpComplete])
+  }, [isSuccess, onWarpComplete, shouldReduceMotion])
 
   return (
     <div className="relative w-full max-w-xl mx-auto z-20 flex items-center justify-center p-2">
@@ -56,23 +58,25 @@ export function VoiceAuthCard({
         initial={{ opacity: 0, y: 20 }}
         animate={
           isSuccess
-            ? {
-                scale: 5,
+            ? shouldReduceMotion
+              ? { opacity: 0 }
+              : {
+                scale: 3,
                 opacity: 0,
-                filter: 'blur(20px)',
+                filter: 'blur(12px)',
                 borderColor: 'rgba(0, 242, 254, 1)',
-                boxShadow: '0 0 120px rgba(0, 242, 254, 1), 0 0 180px rgba(0, 136, 255, 0.9)',
+                boxShadow: '0 0 100px rgba(0, 242, 254, 1), 0 0 140px rgba(0, 136, 255, 0.9)',
                 transition: {
-                  delay: 1.0,
-                  duration: 0.55,
+                  delay: 0.35,
+                  duration: 0.35,
                   ease: [0.32, 0, 0.67, 0],
                 },
               }
             : {
-                opacity: 1,
-                y: 0,
-                transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
-              }
+              opacity: 1,
+              y: 0,
+              transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+            }
         }
         className={cn(
           'w-full bg-[#050811]/75 backdrop-blur-2xl border border-slate-700/50 border-t-accent-light/40 rounded-2xl shadow-[0_0_60px_rgba(59,130,246,0.22)] p-5 sm:p-7 relative overflow-hidden',

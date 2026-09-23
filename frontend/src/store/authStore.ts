@@ -12,11 +12,41 @@ import { apiGet } from '@/services/api'
 
 interface AuthStore extends AuthState {
   setUser:        (user: User) => void
-  setToken:       (token: string) => void
-  login:          (user: User, token: string) => void
+  setToken:       (token: string, persistent?: boolean) => void
+  login:          (user: User, token: string, rememberMe?: boolean) => void
   logout:         () => void
   setLoading:     (loading: boolean) => void
   checkAuth:      () => Promise<boolean>
+}
+
+const hybridStorage = {
+  getItem: (name: string): string | null => {
+    try {
+      return sessionStorage.getItem(name) ?? localStorage.getItem(name)
+    } catch {
+      return null
+    }
+  },
+  setItem: (name: string, value: string): void => {
+    try {
+      const isPersistent = !!localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)
+      if (isPersistent) {
+        localStorage.setItem(name, value)
+      } else {
+        sessionStorage.setItem(name, value)
+      }
+    } catch {
+      /* noop */
+    }
+  },
+  removeItem: (name: string): void => {
+    try {
+      sessionStorage.removeItem(name)
+      localStorage.removeItem(name)
+    } catch {
+      /* noop */
+    }
+  },
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -29,13 +59,28 @@ export const useAuthStore = create<AuthStore>()(
 
       setUser: (user) => set({ user, isAuthenticated: true }),
 
-      setToken: (token) => {
-        storage.set(STORAGE_KEYS.AUTH_TOKEN, token)
+      setToken: (token, persistent = false) => {
+        storage.set(STORAGE_KEYS.AUTH_TOKEN, token, persistent)
         set({ token })
       },
 
-      login: (user, token) => {
-        storage.set(STORAGE_KEYS.AUTH_TOKEN, token)
+      login: (user, token, rememberMe = true) => {
+        storage.set(STORAGE_KEYS.AUTH_TOKEN, token, rememberMe)
+        try {
+          const authPayload = JSON.stringify({
+            state: { user, token, isAuthenticated: true },
+            version: 0,
+          })
+          if (rememberMe) {
+            localStorage.setItem('knowledge-ai-real-auth', authPayload)
+            sessionStorage.removeItem('knowledge-ai-real-auth')
+          } else {
+            sessionStorage.setItem('knowledge-ai-real-auth', authPayload)
+            localStorage.removeItem('knowledge-ai-real-auth')
+          }
+        } catch {
+          /* noop */
+        }
         set({ user, token, isAuthenticated: true })
       },
 
@@ -58,7 +103,7 @@ export const useAuthStore = create<AuthStore>()(
           ])
           set({ user, isAuthenticated: true })
           return true
-        } catch (err) {
+        } catch {
           get().logout()
           return false
         }
@@ -80,7 +125,7 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'knowledge-ai-real-auth',
-      storage: createJSONStorage(() => sessionStorage),
+      storage: createJSONStorage(() => hybridStorage),
       partialize: (state) => ({
         user:            state.user,
         token:           state.token,

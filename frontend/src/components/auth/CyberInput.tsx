@@ -23,8 +23,8 @@ export const CyberInput = forwardRef<HTMLInputElement, CyberInputProps>(
     const [focused, setFocused] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
     const inputId = id || `cyber-input-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
+    const errorId = `${inputId}-error`
 
-    const [isUnlocked, setIsUnlocked] = useState(false)
     const effectiveType = isPassword ? (showPassword ? 'text' : 'password') : type
 
     return (
@@ -51,7 +51,7 @@ export const CyberInput = forwardRef<HTMLInputElement, CyberInputProps>(
               error
                 ? 'border-red-500/70 shadow-[0_0_12px_rgba(239,68,68,0.2)]'
                 : focused
-                ? 'border-slate-700 bg-slate-950/80 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
+                ? 'border-slate-700 bg-slate-950/80 shadow-[0_0_15px_rgba(59,130,246,0.15)] ring-1 ring-accent-primary/40'
                 : 'border-slate-800 hover:border-slate-700/80'
             )}
           >
@@ -67,30 +67,22 @@ export const CyberInput = forwardRef<HTMLInputElement, CyberInputProps>(
               </div>
             )}
 
-            {/* Core HTML Input with autofill shield */}
+            {/* Core HTML Input with standard password manager compatibility */}
             <input
               ref={ref}
               id={inputId}
               type={effectiveType}
               value={props.value !== undefined ? props.value : ''}
-              readOnly={!isUnlocked}
+              aria-invalid={!!error}
+              aria-describedby={error ? errorId : undefined}
               onFocus={(e) => {
-                setIsUnlocked(true)
                 setFocused(true)
                 props.onFocus?.(e)
               }}
-              onPointerDown={() => setIsUnlocked(true)}
               onBlur={(e) => {
                 setFocused(false)
                 props.onBlur?.(e)
               }}
-              autoComplete={props.autoComplete || 'new-password'}
-              autoCorrect="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              data-lpignore="true"
-              data-1p-ignore="true"
-              data-form-type="other"
               className={cn(
                 'w-full bg-transparent text-xs sm:text-sm text-white placeholder-slate-500',
                 'py-2.5 text-xs sm:text-sm transition-all duration-200 outline-none border-none ring-0 focus:outline-none focus:ring-0 focus:border-none',
@@ -106,9 +98,9 @@ export const CyberInput = forwardRef<HTMLInputElement, CyberInputProps>(
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                tabIndex={-1}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
                 className={cn(
-                  'absolute right-3 p-1 rounded-md transition-colors cursor-pointer',
+                  'absolute right-3 p-1 rounded-md transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-light',
                   focused ? 'text-accent-light hover:text-accent-primary' : 'text-slate-500 hover:text-slate-300'
                 )}
                 title={showPassword ? 'Hide password' : 'Show password'}
@@ -130,6 +122,8 @@ export const CyberInput = forwardRef<HTMLInputElement, CyberInputProps>(
         <AnimatePresence>
           {error && (
             <motion.p
+              id={errorId}
+              role="alert"
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}

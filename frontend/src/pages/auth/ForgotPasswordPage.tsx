@@ -154,11 +154,6 @@ export default function ForgotPasswordPage() {
                 className="space-y-3 pt-1"
                 autoComplete="off"
               >
-                {/* Chrome Autofill Decoy Absorber */}
-                <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', opacity: 0, pointerEvents: 'none' }} aria-hidden="true">
-                  <input type="text" name="fake_email_decoy" tabIndex={-1} autoComplete="username" defaultValue="" />
-                </div>
-
                 <div className="space-y-1">
                   <CyberInput
                     label="Work Email Address"
@@ -172,8 +167,8 @@ export default function ForgotPasswordPage() {
                     }}
                     error={error || undefined}
                     icon={Mail}
-                    name="kai_recovery_email"
-                    autoComplete="new-password"
+                    name="email"
+                    autoComplete="email"
                     inputMode="email"
                   />
                   <p className="text-[10px] text-slate-400 px-1">
